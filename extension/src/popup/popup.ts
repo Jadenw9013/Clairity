@@ -24,6 +24,7 @@ const promptEl = document.getElementById("prompt") as HTMLTextAreaElement;
 const buttonEl = document.getElementById("enhance") as HTMLButtonElement;
 const resultSectionEl = document.getElementById("result-section") as HTMLDivElement;
 const resultEl = document.getElementById("result") as HTMLDivElement;
+const copyBtnEl = document.getElementById("copy-result") as HTMLButtonElement;
 const errorEl = document.getElementById("error") as HTMLDivElement;
 const charCountEl = document.getElementById("char-count") as HTMLDivElement;
 const clarifyingEl = document.getElementById("clarifying") as HTMLDivElement;
@@ -201,6 +202,25 @@ async function handleEnhance(): Promise<void> {
 }
 
 buttonEl.addEventListener("click", () => void handleEnhance());
+
+copyBtnEl.addEventListener("click", async () => {
+  const text = resultEl.textContent;
+  if (!text) return;
+
+  try {
+    await navigator.clipboard.writeText(text);
+    const originalText = copyBtnEl.textContent;
+    copyBtnEl.textContent = "Copied!";
+    copyBtnEl.classList.add("copied");
+
+    setTimeout(() => {
+      copyBtnEl.textContent = originalText;
+      copyBtnEl.classList.remove("copied");
+    }, 2000);
+  } catch (err) {
+    console.error("Failed to copy:", err);
+  }
+});
 
 promptEl.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {

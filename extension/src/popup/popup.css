@@ -255,6 +255,36 @@ textarea:focus,
     gap: var(--space-3);
     background: var(--clr-success-bg);
     border-color: var(--clr-success-border);
+    position: relative;
+}
+
+.result-header {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: calc(var(--space-2) * -1);
+}
+
+.cl-copy-btn {
+    background: var(--clr-bg-surface);
+    border: 1px solid var(--clr-success-border);
+    color: var(--clr-success);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.cl-copy-btn:hover {
+    background: var(--clr-success-bg);
+    box-shadow: var(--shadow-sm);
+}
+
+.cl-copy-btn.copied {
+    background: var(--clr-success);
+    color: var(--clr-bg-surface);
+    border-color: var(--clr-success);
 }
 
 .result-box {
