@@ -276,13 +276,13 @@ textarea:focus,
     border-top: 1px dashed var(--clr-success-border);
 }
 
-.compact-score-row {
+.cl-score-row {
     display: flex;
     align-items: center;
     gap: var(--space-2);
 }
 
-.compact-score-row.overall {
+.cl-score-row.overall {
     grid-column: span 2;
     margin-top: var(--space-1);
 }
@@ -347,8 +347,7 @@ textarea:focus,
 }
 
 /* Components injected by popup-logic.ts: lint-tips & risk-badge */
-/* Reusing some existing styles as they are injected dynamically. Note: need to ensure they match tokens if possible */
-.lint-tips {
+.cl-lint-tips {
     margin-top: 12px;
     padding: 10px;
     background: #eff6ff;
@@ -358,20 +357,20 @@ textarea:focus,
     color: #1e3a8a;
 }
 
-.lint-tips h4 {
+.cl-lint-tips h4 {
     margin-bottom: 4px;
     font-size: 12px;
 }
 
-.lint-tips ul {
+.cl-lint-tips ul {
     padding-left: 20px;
 }
 
-.lint-tips li {
+.cl-lint-tips li {
     margin-bottom: 2px;
 }
 
-.risk-badge {
+.cl-risk-badge {
     margin-top: 8px;
     padding: 10px;
     background: #fdf8f6;
@@ -380,13 +379,13 @@ textarea:focus,
     font-size: 12px;
 }
 
-.risk-reasons {
+.cl-risk-reasons {
     margin-top: 4px;
     padding-left: 20px;
     color: #4b5563;
 }
 
-.risk-guardrail {
+.cl-risk-guardrail {
     margin-top: 8px;
     padding: 8px;
     background: #fff;

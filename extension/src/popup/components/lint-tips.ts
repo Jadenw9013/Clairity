@@ -24,7 +24,7 @@ export function renderLintTips(
     const tipsToShow = diagnostics.slice(0, maxTips);
 
     const wrapper = document.createElement("div");
-    wrapper.className = "lint-tips";
+    wrapper.className = "cl-lint-tips";
     wrapper.setAttribute("aria-live", "polite");
 
     const header = document.createElement("h4");

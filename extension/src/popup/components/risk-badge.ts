@@ -20,11 +20,11 @@ export function renderRiskBadge(
     }
 
     const wrapper = document.createElement("div");
-    wrapper.className = "risk-badge";
+    wrapper.className = "cl-risk-badge";
     wrapper.setAttribute("aria-live", "polite");
 
     const label = document.createElement("div");
-    label.className = "risk-label";
+    label.className = "cl-risk-label";
     label.style.color = getRiskColor(risk.risk_level);
     label.style.fontWeight = "bold";
     label.textContent = `Accuracy risk: ${risk.risk_level.charAt(0).toUpperCase() + risk.risk_level.slice(1)}`;
@@ -33,7 +33,7 @@ export function renderRiskBadge(
     if (mode === "advanced") {
         if (risk.risk_factors.length > 0) {
             const list = document.createElement("ul");
-            list.className = "risk-reasons";
+            list.className = "cl-risk-reasons";
             risk.risk_factors.forEach((f) => {
                 const item = document.createElement("li");
                 item.textContent = f.description;
@@ -44,7 +44,7 @@ export function renderRiskBadge(
 
         if (risk.recommended_guardrails.length > 0) {
             const guardrail = document.createElement("div");
-            guardrail.className = "risk-guardrail";
+            guardrail.className = "cl-risk-guardrail";
             const strong = document.createElement("strong");
             strong.textContent = "Add-on idea: ";
             guardrail.appendChild(strong);
