@@ -28,7 +28,7 @@ export function injectEnhanceButton(
 
   // Trigger Button
   const btn = document.createElement("button");
-  btn.className = "cl-btn-ai";
+  btn.className = "cl-trigger cl-btn-ai";
 
   let currentTitle = "Fix my question";
   btn.textContent = currentTitle;
