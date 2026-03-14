@@ -1,0 +1,113 @@
+# =========================
+# Dependencies
+# =========================
+node_modules/
+
+# =========================
+# Build Output
+# =========================
+dist/
+build/
+extension/dist/
+backend/dist/
+
+# =========================
+# Environment Variables
+# =========================
+.env
+.env.local
+.env.*.local
+.env.production
+.env.development
+
+# =========================
+# Logs
+# =========================
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# =========================
+# TypeScript
+# =========================
+*.tsbuildinfo
+
+# =========================
+# Coverage / Testing
+# =========================
+coverage/
+.nyc_output/
+
+# =========================
+# VS Code / IDE
+# =========================
+.vscode/
+!.vscode/extensions.json
+.vscode/settings.json
+
+# =========================
+# Claude / AI Agent Artifacts (local-only)
+# =========================
+# Keep CLAUDE.md if it's a repo doc, ignore local variants + tool state.
+CLAUDE.md.local
+.claude/
+.claude-cache/
+.claude_tmp/
+.claude_memory/
+.claude/settings.local.json
+
+# Common agent scratch/state files
+progress.txt
+tests.json
+agent_state.json
+*.thinking
+*.plan
+*.analysis
+
+# =========================
+# Temporary / Scratch Files
+# =========================
+tmp/
+temp/
+*.tmp
+*.bak
+tmp_*
+*.swp
+
+# =========================
+# Local test/debug output artifacts (do not commit)
+# =========================
+err.txt
+*_out.txt
+typecheck_out.txt
+tsc_error.txt
+vitest_out.txt
+backend/*_out.txt
+backend/vitest_*.txt
+backend/scorer_out.txt
+backend/test_out.txt
+
+# =========================
+# OS Junk
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Chrome / Extension Packaging
+# =========================
+*.crx
+*.vsix
+release/*.zip
+
+# If you intentionally generate zip in release/, ignore those too
+release/*.crx
+
+# =========================
+# Runtime Artifacts
+# =========================
+logs/
+pids/
+*.pid

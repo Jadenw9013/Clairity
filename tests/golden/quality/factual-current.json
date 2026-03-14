@@ -1,0 +1,10 @@
+{
+    "prompt": "List the latest iOS 18 features that were released this month, exactly 5 bullet points.",
+    "expected": {
+        "lint_ids": [
+            "missing-context"
+        ],
+        "risk_level": "low",
+        "intent": "general"
+    }
+}

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clairity Options</title>
+    <link rel="stylesheet" href="../styles/tokens.css">
+    <link rel="stylesheet" href="./options.css">
+</head>
+
+<body class="cl-ui">
+    <div class="options-container">
+        <header class="options-header">
+            <div class="logo-area">
+                <h1>Clairity Settings</h1>
+            </div>
+            <p class="subtitle">Customize your prompt enhancement experience.</p>
+        </header>
+
+        <main class="options-main">
+            <section class="cl-card">
+                <h2>Appearance & Behavior</h2>
+                <div class="setting-row">
+                    <div class="setting-info">
+                        <label for="auto-show-panel">Auto-show Enhancement Panel</label>
+                        <span class="setting-desc">Automatically open the panel when typing long prompts.</span>
+                    </div>
+                    <div class="setting-control">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="auto-show-panel" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </section>
+
+            <section class="cl-card">
+                <h2>About</h2>
+                <p class="about-text">Clairity uses advanced models to structure and clarify your AI prompts, preventing
+                    LLM misdirection and ensuring high-quality outputs.</p>
+                <div class="actions-row">
+                    <button id="reset-defaults" class="cl-btn-secondary">Reset to Defaults</button>
+                </div>
+            </section>
+        </main>
+    </div>
+    <div id="toast" class="toast hidden">Settings saved!</div>
+    <script src="./options.ts" type="module"></script>
+</body>
+
+</html>

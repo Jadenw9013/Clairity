@@ -1,0 +1,10 @@
+{
+    "prompt": "Please write a comprehensive React component for a responsive navigation bar. \n\nTarget audience: Beginner to intermediate frontend developers.\n\nRequirements:\n- Must use TailwindCSS for styling\n- Include a mobile hamburger menu\n- Limit the explanation to under 300 words\n- Format the output as a markdown code block followed by a bulleted list of explanation points.\n\nAvoid any class components, use hooks only.",
+    "expected": {
+        "lint_ids": [
+            "missing-language"
+        ],
+        "risk_level": "low",
+        "intent": "coding"
+    }
+}

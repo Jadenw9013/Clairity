@@ -1,0 +1,17 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "..",
+    "composite": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["chrome"],
+    "paths": {
+      "shared/*": ["../shared/*"]
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "references": [
+    { "path": "../shared" }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "name": "extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "package": "npm run build && node packages/build-manifest.js && node packages/zip-extension.js",
+    "typecheck": "tsc --noEmit",
+    "dev": "vite build --watch --mode development",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.287",
+    "adm-zip": "^0.5.16",
+    "jsdom": "^26.0.0",
+    "typescript": "^5.7.0",
+    "vite": "^6.4.1",
+    "vitest": "^3.0.0"
+  }
+}

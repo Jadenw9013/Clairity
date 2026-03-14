@@ -1,0 +1,31 @@
+{
+  "name": "clairity",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "shared",
+    "backend",
+    "extension"
+  ],
+  "scripts": {
+    "build:shared": "npm run build --workspace=shared",
+    "build": "npm run build:shared && npm run build --workspace=backend && npm run build --workspace=extension",
+    "typecheck": "npm run build:shared && npm run typecheck --workspace=backend && npm run typecheck --workspace=extension",
+    "test": "npm run build:shared && npm test --workspace=backend && npm test --workspace=extension",
+    "lint": "echo 'lint placeholder'",
+    "lint:fix": "echo 'lint:fix placeholder'",
+    "format": "echo 'format placeholder'",
+    "dev:backend": "cross-env NODE_ENV=development SESSION_SECRET=clairity-dev-secret-key-32chars!! npm run dev --workspace=backend",
+    "dev:extension": "npm run dev --workspace=extension",
+    "dev": "concurrently -k -n BACKEND,EXT -c blue,magenta \"npm run dev:backend\" \"npm run dev:extension\"",
+    "build:dev": "npm run build:shared && vite build --mode development",
+    "smoke:dev": "node scripts/smoke-dev.mjs"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.1.4",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "typescript": "^5.7.0",
+    "vite": "^7.3.1"
+  }
+}

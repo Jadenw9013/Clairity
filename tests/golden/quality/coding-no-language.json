@@ -1,0 +1,14 @@
+{
+    "prompt": "Write a script that parses a log file and extracts all IP addresses using a regex. Don't use any external libraries. Make it short.",
+    "expected": {
+        "lint_ids": [
+            "ambiguous-pronoun",
+            "missing-context",
+            "missing-language",
+            "no-constraints",
+            "no-output-format"
+        ],
+        "risk_level": "low",
+        "intent": "coding"
+    }
+}

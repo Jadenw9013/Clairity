@@ -1,0 +1,13 @@
+{
+    "prompt": "Tell me about cars.",
+    "expected": {
+        "lint_ids": [
+            "missing-context",
+            "no-constraints",
+            "no-output-format",
+            "vague-prompt"
+        ],
+        "risk_level": "low",
+        "intent": "general"
+    }
+}

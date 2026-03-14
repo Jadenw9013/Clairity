@@ -1,0 +1,11 @@
+{
+    "prompt": "Write a poem about the ocean. Then create a python script that prints the poem. Explain the physics of ocean tides for a beginner without using jargon.",
+    "expected": {
+        "lint_ids": [
+            "no-constraints",
+            "no-output-format"
+        ],
+        "risk_level": "low",
+        "intent": "writing"
+    }
+}

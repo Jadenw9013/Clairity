@@ -1,0 +1,12 @@
+{
+    "prompt": "I need medical advice. What is the current recommended dosage for treating a headache? Also, what are my legal options if a doctor prescribed the wrong medication and caused lasting damage?",
+    "expected": {
+        "lint_ids": [
+            "multiple-questions",
+            "no-constraints",
+            "no-output-format"
+        ],
+        "risk_level": "medium",
+        "intent": "general"
+    }
+}
