@@ -12,6 +12,15 @@
 // ──────────────────────────────────────────────────────────────────────────────
 
 import { logger } from "./logger.js";
+
+/** Standardized failure types for MCS integration */
+export type McsErrorType =
+    | "config_error"
+    | "connection_error"
+    | "timeout_error"
+    | "invalid_payload"
+    | "unsupported_target"
+    | "empty_context";
 import {
     MCS_ENABLED,
     MCS_BASE_URL,
@@ -157,12 +166,12 @@ async function mcsGet<T>(path: string, timeoutMs: number = MCS_TIMEOUT_MS): Prom
         const isConnRefused = err instanceof TypeError && /fetch failed|ECONNREFUSED/i.test(String(err));
 
         if (isAbort) {
-            logger.warn({ url, timeoutMs }, "MCS request timed out — fallback to no-context rewrite");
+            logger.warn({ url, timeoutMs, errorType: "timeout_error" }, "MCS request timed out — fallback to no-context rewrite");
         } else if (isConnRefused) {
-            logger.warn({ url }, "MCS daemon not reachable (connection refused) — fallback to no-context rewrite");
+            logger.warn({ url, errorType: "connection_error" }, "MCS daemon not reachable (connection refused) — fallback to no-context rewrite");
         } else {
             logger.warn(
-                { url, error: err instanceof Error ? err.message : String(err) },
+                { url, errorType: "connection_error", error: err instanceof Error ? err.message : String(err) },
                 "MCS request failed — fallback to no-context rewrite"
             );
         }
@@ -244,14 +253,14 @@ export async function fetchMcsContext(params: McsContextParams): Promise<McsCont
     );
 
     const data = await mcsGet<McsPackResponse>(packUrl);
-    if (!data) {
-        logger.warn({ target }, "MCS pack returned null — fallback path used");
+    if (!data || typeof data !== "object") {
+        logger.warn({ target, errorType: "invalid_payload" }, "MCS pack returned null or invalid — fallback path used");
         return null;
     }
 
-    const allNodes = data.graph?.nodes ?? [];
-    if (allNodes.length === 0) {
-        logger.info({ target, task: task.slice(0, 50) }, "MCS pack returned 0 nodes — fallback path used");
+    const allNodes = data.graph?.nodes;
+    if (!Array.isArray(allNodes) || allNodes.length === 0) {
+        logger.info({ target, task: task.slice(0, 50), errorType: "empty_context" }, "MCS pack returned 0 or invalid nodes — fallback path used");
         return null;
     }
 
