@@ -12,27 +12,46 @@ export function renderRiskBadge(
     risk: RiskAssessment,
     mode: "simple" | "advanced"
 ) {
+    // Clear container safely
+    container.textContent = "";
+
     if (risk.risk_score === 0 && risk.risk_level === "low") {
-        container.innerHTML = "";
         return;
     }
 
-    // Advanced mode shows guardrail and reasons
-    const reasonsHTML = mode === "advanced" && risk.risk_factors.length > 0
-        ? `<ul class="risk-reasons">${risk.risk_factors.map(f => `<li>${f.description}</li>`).join("")}</ul>`
-        : "";
+    const wrapper = document.createElement("div");
+    wrapper.className = "risk-badge";
+    wrapper.setAttribute("aria-live", "polite");
 
-    const guardrailHTML = mode === "advanced" && risk.recommended_guardrails.length > 0
-        ? `<div class="risk-guardrail"><strong>Add-on idea:</strong> ${risk.recommended_guardrails[0]}</div>`
-        : "";
+    const label = document.createElement("div");
+    label.className = "risk-label";
+    label.style.color = getRiskColor(risk.risk_level);
+    label.style.fontWeight = "bold";
+    label.textContent = `Accuracy risk: ${risk.risk_level.charAt(0).toUpperCase() + risk.risk_level.slice(1)}`;
+    wrapper.appendChild(label);
 
-    container.innerHTML = `
-        <div class="risk-badge" aria-live="polite">
-            <div class="risk-label" style="color: ${getRiskColor(risk.risk_level)}; font-weight: bold;">
-                Accuracy risk: ${risk.risk_level.charAt(0).toUpperCase() + risk.risk_level.slice(1)}
-            </div>
-            ${reasonsHTML}
-            ${guardrailHTML}
-        </div>
-    `;
+    if (mode === "advanced") {
+        if (risk.risk_factors.length > 0) {
+            const list = document.createElement("ul");
+            list.className = "risk-reasons";
+            risk.risk_factors.forEach((f) => {
+                const item = document.createElement("li");
+                item.textContent = f.description;
+                list.appendChild(item);
+            });
+            wrapper.appendChild(list);
+        }
+
+        if (risk.recommended_guardrails.length > 0) {
+            const guardrail = document.createElement("div");
+            guardrail.className = "risk-guardrail";
+            const strong = document.createElement("strong");
+            strong.textContent = "Add-on idea: ";
+            guardrail.appendChild(strong);
+            guardrail.appendChild(document.createTextNode(risk.recommended_guardrails[0] || ""));
+            wrapper.appendChild(guardrail);
+        }
+    }
+
+    container.appendChild(wrapper);
 }

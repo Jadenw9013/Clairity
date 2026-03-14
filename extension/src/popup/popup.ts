@@ -60,8 +60,8 @@ initModeToggle(modeToggleContainer, (mode) => {
 async function runAnalysisSync() {
   const prompt = promptEl.value.trim();
   if (!prompt || !lintEngine || !riskEngine) {
-    lintContainer.innerHTML = "";
-    riskContainer.innerHTML = "";
+    lintContainer.textContent = "";
+    riskContainer.textContent = "";
     qualityFillEl.style.width = "0%";
     qualityLabelEl.textContent = "Prompt Quality";
     return;
@@ -213,14 +213,48 @@ promptEl.addEventListener("keydown", (e) => {
 declare const __CLAIRITY_DEV__: boolean;
 if (typeof __CLAIRITY_DEV__ !== "undefined" && __CLAIRITY_DEV__) {
   const diagContainer = document.createElement("div");
-  diagContainer.style.cssText = "margin-top:12px;padding:8px;border:1px dashed #6366f1;border-radius:6px;font-size:11px;";
-  diagContainer.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;">
-      <span style="color:#6366f1;font-weight:600;">🔧 DEV DIAGNOSTICS</span>
-      <button id="diag-btn" style="padding:3px 8px;font-size:11px;cursor:pointer;border:1px solid #6366f1;border-radius:4px;background:#eef2ff;color:#4338ca;">Run Diagnostics</button>
-    </div>
-    <pre id="diag-output" style="margin-top:6px;white-space:pre-wrap;word-break:break-all;max-height:200px;overflow-y:auto;display:none;background:#f8fafc;padding:6px;border-radius:4px;font-size:10px;"></pre>
-  `;
+  diagContainer.style.cssText =
+    "margin-top:12px;padding:8px;border:1px dashed #6366f1;border-radius:6px;font-size:11px;";
+
+  const header = document.createElement("div");
+  header.style.display = "flex";
+  header.style.justifyContent = "space-between";
+  header.style.alignItems = "center";
+
+  const label = document.createElement("span");
+  label.style.color = "#6366f1";
+  label.style.fontWeight = "600";
+  label.textContent = "🔧 DEV DIAGNOSTICS";
+
+  const btn = document.createElement("button");
+  btn.id = "diag-btn";
+  btn.style.padding = "3px 8px";
+  btn.style.fontSize = "11px";
+  btn.style.cursor = "pointer";
+  btn.style.border = "1px solid #6366f1";
+  btn.style.borderRadius = "4px";
+  btn.style.background = "#eef2ff";
+  btn.style.color = "#4338ca";
+  btn.textContent = "Run Diagnostics";
+
+  header.appendChild(label);
+  header.appendChild(btn);
+
+  const output = document.createElement("pre");
+  output.id = "diag-output";
+  output.style.marginTop = "6px";
+  output.style.whiteSpace = "pre-wrap";
+  output.style.wordBreak = "break-all";
+  output.style.maxHeight = "200px";
+  output.style.overflowY = "auto";
+  output.style.display = "none";
+  output.style.background = "#f8fafc";
+  output.style.padding = "6px";
+  output.style.borderRadius = "4px";
+  output.style.fontSize = "10px";
+
+  diagContainer.appendChild(header);
+  diagContainer.appendChild(output);
   document.body.appendChild(diagContainer);
 
   document.getElementById("diag-btn")!.addEventListener("click", async () => {

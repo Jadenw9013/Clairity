@@ -14,20 +14,28 @@ export function initModeToggle(
     });
 
     function render(currentMode: Mode) {
-        container.innerHTML = `
-      <div class="mode-toggle" role="group" aria-label="UX Mode">
-        <label>
-          <input type="radio" name="uxMode" value="simple" ${currentMode === "simple" ? "checked" : ""
-            }>
-          Simple
-        </label>
-        <label>
-          <input type="radio" name="uxMode" value="advanced" ${currentMode === "advanced" ? "checked" : ""
-            }>
-          Advanced
-        </label>
-      </div>
-    `;
+        container.textContent = "";
+
+        const wrapper = document.createElement("div");
+        wrapper.className = "mode-toggle";
+        wrapper.setAttribute("role", "group");
+        wrapper.setAttribute("aria-label", "UX Mode");
+
+        const modes: Mode[] = ["simple", "advanced"];
+        modes.forEach((mode) => {
+            const label = document.createElement("label");
+            const input = document.createElement("input");
+            input.type = "radio";
+            input.name = "uxMode";
+            input.value = mode;
+            input.checked = currentMode === mode;
+
+            label.appendChild(input);
+            label.appendChild(document.createTextNode(` ${mode.charAt(0).toUpperCase() + mode.slice(1)}`));
+            wrapper.appendChild(label);
+        });
+
+        container.appendChild(wrapper);
 
         const inputs = container.querySelectorAll("input");
         inputs.forEach((input) => {
