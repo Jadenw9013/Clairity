@@ -1,0 +1,3 @@
+## 2025-05-14 - Debounce MutationObserver in content script
+**Learning:** MutationObserver on `document.body` with `subtree: true` in SPAs (like ChatGPT/Claude) can be extremely noisy, especially during AI message streaming where every token might trigger a DOM mutation. This leads to excessive CPU usage if the callback performs DOM lookups or `querySelector` calls.
+**Action:** Always debounce MutationObserver callbacks in content scripts that monitor the whole document to ensure they only run after a burst of activity, significantly improving extension performance and reducing main thread blocking.
