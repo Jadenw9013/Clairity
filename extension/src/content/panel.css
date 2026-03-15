@@ -257,3 +257,81 @@
 /* Legacy classes kept for popup.ts compatibility */
 .hidden { display: none !important; }
 .cl-panel { display: none; }
+
+/* ── Brief chip (STATE 2/3 — clickable) ── */
+.cl-brief-chip {
+  cursor: pointer;
+  user-select: none;
+  transition: background 120ms, opacity 120ms;
+}
+
+.cl-brief-chip:hover {
+  opacity: 0.8;
+}
+
+.cl-brief-chip:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+/* ── Brief expansion panel ── */
+.cl-brief-panel {
+  margin: 0 14px 6px;
+  padding: 10px 12px;
+  background: #f4f4f5;
+  border-radius: 8px;
+  border: 1px solid #e4e4e7;
+  font-size: 12px;
+  color: #3f3f46;
+  line-height: 1.5;
+}
+
+.cl-brief-section {
+  margin-bottom: 8px;
+}
+
+.cl-brief-section:last-of-type {
+  margin-bottom: 4px;
+}
+
+.cl-brief-section strong {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #71717a;
+  margin-bottom: 2px;
+}
+
+.cl-brief-section p {
+  margin: 0;
+  color: #27272a;
+}
+
+.cl-brief-section ul {
+  margin: 0;
+  padding-left: 14px;
+  color: #27272a;
+}
+
+.cl-brief-section li {
+  margin-bottom: 1px;
+}
+
+.cl-brief-close {
+  display: block;
+  margin-top: 8px;
+  padding: 0;
+  background: none;
+  border: none;
+  font-size: 11px;
+  color: #a1a1aa;
+  cursor: pointer;
+  text-align: left;
+  transition: color 100ms;
+}
+
+.cl-brief-close:hover {
+  color: #52525b;
+}

@@ -1,4 +1,4 @@
-import type { SiteAdapter } from "shared/types/index.ts";
+import type { SiteAdapter, ConversationBrief } from "shared/types/index.ts";
 import type { RewriteResponse, ErrorResponse, Site } from "shared/types/index.ts";
 // @ts-ignore
 import tokensCss from "../styles/tokens.css?inline";
@@ -26,11 +26,13 @@ function dismissCard(): void {
 /**
  * Show the bottom-right preview card with the enhanced prompt.
  * "Use this prompt" injects into the textarea. "Copy" copies to clipboard.
+ * When brief is provided (STATE 2/3), chip is clickable and shows brief panel.
  */
 function showPreviewCard(
   enhancedPrompt: string,
   historyLength: number,
-  adapter: SiteAdapter
+  adapter: SiteAdapter,
+  brief?: ConversationBrief
 ): void {
   dismissCard();
 
@@ -67,13 +69,64 @@ function showPreviewCard(
   header.appendChild(closeBtn);
   root.appendChild(header);
 
-  // Chip
+  // Chip — STATE 1: plain, STATE 2/3: clickable brief chip
   const chip = document.createElement("div");
-  chip.className = "cl-card-chip";
-  chip.textContent = historyLength === 0
-    ? "✦ first prompt"
-    : `✦ ${historyLength} messages used`;
-  root.appendChild(chip);
+  if (brief) {
+    chip.className = "cl-card-chip cl-brief-chip";
+    chip.textContent = "✦ conversation brief active";
+    chip.setAttribute("role", "button");
+    chip.setAttribute("aria-label", "View conversation brief");
+    chip.setAttribute("tabindex", "0");
+
+    // Build expandable brief panel (hidden by default)
+    const briefPanel = document.createElement("div");
+    briefPanel.className = "cl-brief-panel";
+    briefPanel.hidden = true;
+
+    const briefContent = [
+      brief.goal ? `<div class="cl-brief-section"><strong>Goal</strong><p>${brief.goal}</p></div>` : "",
+      brief.activeTopic ? `<div class="cl-brief-section"><strong>Topic</strong><p>${brief.activeTopic}</p></div>` : "",
+      brief.establishedContext.length > 0
+        ? `<div class="cl-brief-section"><strong>Context</strong><ul>${brief.establishedContext.map((c) => `<li>${c}</li>`).join("")}</ul></div>`
+        : "",
+      brief.avoid.length > 0
+        ? `<div class="cl-brief-section"><strong>Not repeating</strong><ul>${brief.avoid.map((a) => `<li>${a}</li>`).join("")}</ul></div>`
+        : "",
+    ].filter(Boolean).join("");
+
+    briefPanel.innerHTML = briefContent;
+
+    const closePanelBtn = document.createElement("button");
+    closePanelBtn.className = "cl-brief-close";
+    closePanelBtn.textContent = "✕ Close brief";
+    closePanelBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      briefPanel.hidden = true;
+      chip.textContent = "✦ conversation brief active";
+    });
+    briefPanel.appendChild(closePanelBtn);
+
+    // Toggle panel on chip click
+    const togglePanel = () => {
+      briefPanel.hidden = !briefPanel.hidden;
+      chip.textContent = briefPanel.hidden
+        ? "✦ conversation brief active"
+        : "✦ conversation brief ▲";
+    };
+    chip.addEventListener("click", togglePanel);
+    chip.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); togglePanel(); }
+    });
+
+    root.appendChild(chip);
+    root.appendChild(briefPanel);
+  } else {
+    chip.className = "cl-card-chip";
+    chip.textContent = historyLength === 0
+      ? "✦ first prompt"
+      : `✦ ${historyLength} messages used`;
+    root.appendChild(chip);
+  }
 
   // Enhanced prompt preview
   const preview = document.createElement("div");
@@ -233,8 +286,8 @@ export function injectEnhanceButton(
       if (!response) {
         showErrorCard("No response from service worker — try reloading the extension.");
       } else if (response.type === "REWRITE_RESULT") {
-        const data = response.payload as RewriteResponse;
-        showPreviewCard(data.enhanced_prompt, data.history_length, adapter);
+        const data = response.payload as RewriteResponse & { briefActive: boolean; brief?: ConversationBrief };
+        showPreviewCard(data.enhanced_prompt, data.history_length, adapter, data.briefActive ? data.brief : undefined);
       } else if (response.type === "REWRITE_ERROR") {
         const data = response.payload as ErrorResponse;
         showErrorCard(data.error || "Unknown error from backend");

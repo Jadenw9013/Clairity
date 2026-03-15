@@ -14,6 +14,7 @@ const MAX_TOKENS = 600;
 export interface LlmCallParams {
   system: string;
   messages: Array<{ role: "user" | "assistant"; content: string }>;
+  maxTokens?: number;
 }
 
 export interface LlmResult {
@@ -47,7 +48,7 @@ export async function callLlm(params: LlmCallParams): Promise<LlmResult | null> 
   try {
     const response = await client.messages.create({
       model: MODEL,
-      max_tokens: MAX_TOKENS,
+      max_tokens: params.maxTokens ?? MAX_TOKENS,
       system: params.system,
       messages: params.messages,
     });

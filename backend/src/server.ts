@@ -5,12 +5,14 @@ import pinoHttp from "pino-http";
 import healthRouter from "./routes/v1/health.js";
 import rewriteRouter from "./routes/v1/rewrite.js";
 import sessionRouter from "./routes/v1/session.js";
+import briefRouter from "./routes/v1/brief.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { requireAuth } from "./middleware/auth.js";
 import { apiLimiter, sessionLimiter } from "./middleware/rateLimit.js";
 
 import { logFeatureFlags } from "./lib/featureFlags.js";
 import { logger } from "./lib/logger.js";
+
 
 // Re-export logger for any existing consumers
 export { logger };
@@ -111,6 +113,7 @@ app.use("/v1", sessionRouter);
 
 // Protected routes (auth required + rate limited)
 app.use("/v1", requireAuth, apiLimiter, rewriteRouter);
+app.use("/v1", requireAuth, apiLimiter, briefRouter);
 
 // Global error handler (must be last)
 app.use(errorHandler(logger));

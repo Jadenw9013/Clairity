@@ -3,6 +3,8 @@ import type {
   ErrorResponse,
   SessionResponse,
   Message,
+  ConversationBrief,
+  BriefResponse,
 } from "shared/types/index.ts";
 
 import { API_BASE } from "../config.js";
@@ -10,6 +12,10 @@ import {
   getHistory,
   appendUserMessage,
   appendAssistantMessage,
+  getBrief,
+  setBrief,
+  shouldExtractBrief,
+  shouldUpdateBrief,
 } from "../lib/conversationStore.js";
 
 declare const __CLAIRITY_DEV__: boolean;
@@ -87,6 +93,7 @@ interface RewriteMessage {
     site: "chatgpt" | "claude" | "gemini";
     conversationId: string;
     history?: Message[];
+    brief?: ConversationBrief;
   };
 }
 
@@ -95,46 +102,121 @@ type IncomingMessage =
   | { type: "KEEPALIVE" }
   | { type: "CLAIRITY_DIAGNOSE" };
 
+interface RewriteResultPayload extends RewriteResponse {
+  briefActive: boolean;
+  brief?: ConversationBrief;
+}
+
 async function callRewrite(
   prompt: string,
   history: Message[],
   site: string,
-  token: string
+  token: string,
+  brief: ConversationBrief | null
 ): Promise<Response> {
+  const body: Record<string, unknown> = { prompt, history, site };
+  if (brief) body["brief"] = brief;
+
   return apiFetch(`${API_BASE}/rewrite`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ prompt, history, site }),
+    body: JSON.stringify(body),
   });
+}
+
+/**
+ * Fire-and-forget: extract a new brief from history and store it.
+ * Called when messageCount reaches 6 and no brief exists yet.
+ */
+function triggerBriefExtraction(
+  conversationId: string,
+  history: Message[],
+  token: string
+): void {
+  (async () => {
+    try {
+      const res = await apiFetch(`${API_BASE}/brief/extract`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ history }),
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as BriefResponse;
+      if (data.brief) {
+        await setBrief(conversationId, data.brief);
+        devLog(`Brief extracted for ${conversationId}: goal="${data.brief.goal.slice(0, 50)}"`);
+      }
+    } catch (err) {
+      devWarn("Brief extraction failed (non-blocking):", err);
+    }
+  })();
+}
+
+/**
+ * Fire-and-forget: update the existing brief with the latest messages.
+ * Called every 4 messages after brief is active.
+ */
+function triggerBriefUpdate(
+  conversationId: string,
+  currentBrief: ConversationBrief,
+  newMessages: Message[],
+  token: string
+): void {
+  (async () => {
+    try {
+      const res = await apiFetch(`${API_BASE}/brief/update`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ currentBrief, newMessages }),
+      });
+      if (!res.ok) return;
+      const data = (await res.json()) as BriefResponse;
+      if (data.brief) {
+        await setBrief(conversationId, data.brief);
+        devLog(`Brief updated for ${conversationId}: msgCount=${data.brief.messageCount}`);
+      }
+    } catch (err) {
+      devWarn("Brief update failed (non-blocking):", err);
+    }
+  })();
 }
 
 async function handleRewrite(
   payload: RewriteMessage["payload"]
 ): Promise<
-  | { type: "REWRITE_RESULT"; payload: RewriteResponse }
+  | { type: "REWRITE_RESULT"; payload: RewriteResultPayload }
   | { type: "REWRITE_ERROR"; payload: ErrorResponse }
 > {
   const { prompt, site, conversationId, history: domHistory } = payload;
 
   try {
     // Prefer DOM history (extracted live from the page) over session store.
-    // Session store is a fallback for when DOM extraction returns nothing.
     const sessionHistory = await getHistory(conversationId);
     const history = (domHistory && domHistory.length > 0) ? domHistory : sessionHistory;
-    devLog(`History for ${conversationId}: ${history.length} messages (source: ${domHistory && domHistory.length > 0 ? 'DOM' : 'session'})`);
+    devLog(`History for ${conversationId}: ${history.length} messages (source: ${domHistory && domHistory.length > 0 ? "DOM" : "session"})`);
+
+    // Get current brief (null = STATE 1, present = STATE 2/3)
+    const brief = await getBrief(conversationId);
+    devLog(`Brief for ${conversationId}: ${brief ? "active" : "none"}`);
 
     let token = await getSessionToken();
-    let res = await callRewrite(prompt, history, site, token);
+    let res = await callRewrite(prompt, history, site, token, brief);
 
     // If 401, refresh token once and retry
     if (res.status === 401) {
       devWarn("Got 401, refreshing token...");
       clearCachedToken();
       token = await getSessionToken();
-      res = await callRewrite(prompt, history, site, token);
+      res = await callRewrite(prompt, history, site, token, brief);
     }
 
     if (!res.ok) {
@@ -143,14 +225,34 @@ async function handleRewrite(
     }
 
     const data = (await res.json()) as RewriteResponse;
-    devLog(`Rewrite success: enhanced_prompt length=${data.enhanced_prompt.length}`);
+    devLog(`Rewrite success: enhanced_prompt length=${data.enhanced_prompt.length}, brief_active=${data.brief_active}`);
 
     // Store the user message now (after successful rewrite)
     await appendUserMessage(conversationId, prompt);
     // Store the enhanced prompt as the "assistant" turn for context continuity
     await appendAssistantMessage(conversationId, data.enhanced_prompt);
 
-    return { type: "REWRITE_RESULT", payload: data };
+    // Fire-and-forget brief operations based on current state
+    if (await shouldExtractBrief(conversationId)) {
+      devLog("Triggering brief extraction (fire-and-forget)");
+      triggerBriefExtraction(conversationId, history, token);
+    } else if (brief && (await shouldUpdateBrief(conversationId))) {
+      devLog("Triggering brief update (fire-and-forget)");
+      const newMessages: Message[] = [
+        { role: "user", content: prompt },
+        { role: "assistant", content: data.enhanced_prompt },
+      ];
+      triggerBriefUpdate(conversationId, brief, newMessages, token);
+    }
+
+    return {
+      type: "REWRITE_RESULT",
+      payload: {
+        ...data,
+        briefActive: !!brief,
+        brief: brief ?? undefined,
+      },
+    };
   } catch (err: unknown) {
     const isAbort = err instanceof DOMException && err.name === "AbortError";
     const message = isAbort
@@ -194,6 +296,7 @@ async function runDiagnostics(): Promise<Record<string, unknown>> {
         enhanced_prompt_length: result.payload.enhanced_prompt.length,
         history_length: result.payload.history_length,
         model: result.payload.model,
+        brief_active: result.payload.briefActive,
       };
     } else {
       report.rewrite = { status: "error", error: result.payload };

@@ -5,12 +5,13 @@
 import { buildSystemPrompt, type Message } from "./llmPrompts.js";
 import { callLlm } from "./llmClient.js";
 import { logger } from "./logger.js";
-import type { Site } from "shared/types/index.ts";
+import type { Site, ConversationBrief } from "shared/types/index.ts";
 
 export interface LyraInput {
   prompt: string;
   history: Message[];
   site: Site;
+  brief?: ConversationBrief;
 }
 
 export interface LyraOutput {
@@ -24,9 +25,9 @@ export interface LyraOutput {
  * Never throws.
  */
 export async function callLyra(input: LyraInput): Promise<LyraOutput> {
-  const { prompt, history, site } = input;
+  const { prompt, history, site, brief } = input;
 
-  const system = buildSystemPrompt(history, site);
+  const system = buildSystemPrompt(history, site, brief);
 
   // Compose message list: history context + the user's current prompt
   const messages: Message[] = [
@@ -37,7 +38,7 @@ export async function callLyra(input: LyraInput): Promise<LyraOutput> {
   const result = await callLlm({ system, messages });
 
   if (!result) {
-    logger.info({ module: "rewriteEngine", historyLen: history.length }, "LLM unavailable — returning original prompt");
+    logger.info({ module: "rewriteEngine", historyLen: history.length, briefActive: !!brief }, "LLM unavailable — returning original prompt");
     return { enhanced_prompt: prompt, model: "fallback" };
   }
 

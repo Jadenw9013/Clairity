@@ -10,11 +10,34 @@ export interface Message {
   content: string;
 }
 
+/**
+ * Living structured brief of a conversation.
+ * Created after 6 messages, updated every 4 messages thereafter.
+ * Replaces raw history truncation as the primary context payload.
+ */
+export interface ConversationBrief {
+  /** User's inferred overarching goal */
+  goal: string;
+  /** Confirmed decisions, facts, and constraints */
+  establishedContext: string[];
+  /** How the user communicates (technical level, format preference, verbosity) */
+  userStyle: string;
+  /** What is being discussed right now */
+  activeTopic: string;
+  /** Things already covered in detail — Lyra must not repeat these */
+  avoid: string[];
+  /** Total messages seen so far */
+  messageCount: number;
+  /** Timestamp of last brief update */
+  lastUpdatedAt: number;
+}
+
 /** Request body for POST /v1/rewrite */
 export interface RewriteRequest {
   prompt: string;
   history: Message[];
   site: Site;
+  brief?: ConversationBrief;
 }
 
 /** Successful response from POST /v1/rewrite */
@@ -22,6 +45,7 @@ export interface RewriteResponse {
   enhanced_prompt: string;
   history_length: number;
   model: string;
+  brief_active?: boolean;
 }
 
 /** Standard error response from all endpoints */
@@ -78,9 +102,13 @@ export interface HealthResponse {
   timestamp: string;
 }
 
+/** Response from POST /v1/brief/extract and /v1/brief/update */
+export interface BriefResponse {
+  brief: ConversationBrief | null;
+}
+
 /** Message types for chrome.runtime messaging */
 export type ExtensionMessage =
-  | { type: "REWRITE_PROMPT"; payload: { prompt: string; site: Site; history: Message[]; conversationId: string } }
-  | { type: "REWRITE_RESULT"; payload: RewriteResponse }
+  | { type: "REWRITE_PROMPT"; payload: { prompt: string; site: Site; history: Message[]; conversationId: string; brief?: ConversationBrief } }
+  | { type: "REWRITE_RESULT"; payload: RewriteResponse & { briefActive: boolean; brief?: ConversationBrief } }
   | { type: "REWRITE_ERROR"; payload: ErrorResponse };
-

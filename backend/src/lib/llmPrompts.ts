@@ -1,7 +1,7 @@
 // backend/src/lib/llmPrompts.ts
 // All LLM prompts stored as named constants. Never inline prompt strings elsewhere.
 
-import type { Site } from "shared/types/index.ts";
+import type { Site, ConversationBrief } from "shared/types/index.ts";
 
 export type Message = { role: "user" | "assistant"; content: string };
 
@@ -40,13 +40,99 @@ WHEN HISTORY IS PROVIDED:
 - Reference established context — do not re-explain it
 - Make the prompt feel like a natural expert follow-up`;
 
+// ---------------------------------------------------------------------------
+// Brief extraction prompt — returns JSON-only ConversationBrief shape
+// ---------------------------------------------------------------------------
+export const EXTRACT_BRIEF_PROMPT = `You are a conversation analyst. Read the conversation below and extract a structured brief as JSON.
+
+Output exactly this JSON shape and nothing else:
+{
+  "goal": "one sentence describing what the user is trying to accomplish",
+  "establishedContext": ["fact 1", "fact 2", "fact 3"],
+  "userStyle": "one sentence describing how the user communicates",
+  "activeTopic": "one sentence describing what is being discussed now",
+  "avoid": ["thing already explained 1", "thing already explained 2"]
+}
+
+Rules:
+- goal must be specific, not generic ("Build a Chrome extension prompt enhancer" not "work on a project")
+- establishedContext: only confirmed decisions and facts, not speculation. Max 5 items.
+- userStyle: note technical level, preferred format, verbosity preference
+- activeTopic: the most recent focus, not the overall goal
+- avoid: things the AI has already explained in detail. Max 5 items.
+- Output valid JSON only. No preamble. No explanation.
+- If uncertain about any field, use an empty string or empty array. Do not guess. Do not invent facts not present in the conversation.`;
+
+// ---------------------------------------------------------------------------
+// Brief update prompt — merges new messages into existing brief
+// ---------------------------------------------------------------------------
+export const UPDATE_BRIEF_PROMPT = `You are a conversation analyst maintaining a running brief.
+You have the current brief and new messages from the conversation.
+Update the brief to reflect what has changed.
+
+Output exactly the same JSON shape as the current brief, updated to reflect the new messages. Rules:
+- Only update fields that have genuinely changed
+- Add new items to establishedContext if new decisions were made
+- Update activeTopic to reflect the latest focus
+- Add to avoid if the AI explained something new in detail
+- Refine userStyle only if new evidence changes it
+- Increment messageCount by the number of new messages
+- Set lastUpdatedAt to current Unix timestamp in milliseconds
+- Output valid JSON only. No preamble. No explanation.
+- If nothing meaningful changed, return the current brief unchanged.`;
+
+// ---------------------------------------------------------------------------
+// buildSystemPrompt — assembles system prompt for Lyra at runtime
+// ---------------------------------------------------------------------------
+
 /**
  * Build the full system prompt by appending the dynamic history/site block.
+ * When a brief is provided (STATE 2/3), uses structured brief + last 2 message pairs.
+ * When no brief (STATE 1), falls back to raw history block.
  * Called at runtime before each LLM call.
  */
-export function buildSystemPrompt(history: Message[], site: Site): string {
+export function buildSystemPrompt(
+  history: Message[],
+  site: Site,
+  brief?: ConversationBrief
+): string {
   const siteLabel = site === "chatgpt" ? "ChatGPT" : site === "claude" ? "Claude" : "Gemini";
 
+  // STATE 2/3: Brief active — use structured context + last 2 message pairs
+  if (brief) {
+    const contextList = brief.establishedContext.length > 0
+      ? brief.establishedContext.map((c) => `- ${c}`).join("\n")
+      : "- (none yet)";
+
+    const avoidList = brief.avoid.length > 0
+      ? brief.avoid.join(", ")
+      : "(none)";
+
+    // Last 2 message pairs (up to 4 messages) for immediate continuity
+    const recentMessages = history.slice(-4);
+    const recentBlock = recentMessages.length > 0
+      ? "\n\nRecent exchanges:\n" +
+        recentMessages
+          .map((m) => `${m.role === "user" ? "USER" : "ASSISTANT"}: ${m.content}`)
+          .join("\n\n")
+      : "";
+
+    return (
+      LYRA_SYSTEM_PROMPT +
+      `\n\nYou have a structured brief of this conversation below. ` +
+      `Use it to make the rewritten prompt contextually precise.\n\n` +
+      `Goal: ${brief.goal}\n` +
+      `Active topic: ${brief.activeTopic}\n` +
+      `Established context:\n${contextList}\n` +
+      `User style: ${brief.userStyle}\n` +
+      `Do not re-explain: ${avoidList}` +
+      recentBlock +
+      `\n\nTailor your optimization to the target platform: ${siteLabel}. ` +
+      `Build directly on what is established. Do not repeat what is in the avoid list.`
+    );
+  }
+
+  // STATE 1: No brief yet — use raw history
   if (history.length > 0) {
     const formattedHistory = history
       .map((m) => `${m.role === "user" ? "USER" : "ASSISTANT"}: ${m.content}`)
@@ -66,8 +152,7 @@ export function buildSystemPrompt(history: Message[], site: Site): string {
 
   return (
     LYRA_SYSTEM_PROMPT +
-    `\n\nThere is no prior conversation history. Optimize this prompt cold ` +
-    `using the 4-D methodology above. Tailor your optimization to the ` +
-    `target platform: ${siteLabel}.`
+    `\n\nThere is no prior conversation history. Optimize this prompt cold. ` +
+    `Tailor your optimization to the target platform: ${siteLabel}.`
   );
 }
