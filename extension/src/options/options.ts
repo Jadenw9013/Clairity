@@ -2,8 +2,12 @@ const autoShowPanelToggle = document.getElementById("auto-show-panel") as HTMLIn
 const resetBtn = document.getElementById("reset-defaults") as HTMLButtonElement;
 const toast = document.getElementById("toast") as HTMLDivElement;
 
+interface OptionsSettings {
+    autoShowPanel?: boolean;
+}
+
 // Load initial settings
-chrome.storage.local.get(["autoShowPanel"], (res: any) => {
+chrome.storage.local.get(["autoShowPanel"], (res: OptionsSettings) => {
     if (res.autoShowPanel !== undefined) {
         autoShowPanelToggle.checked = res.autoShowPanel;
     }
