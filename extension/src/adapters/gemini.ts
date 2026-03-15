@@ -1,20 +1,21 @@
 import type { SiteAdapter, Message } from "shared/types/index.ts";
 
-/** Selector fallback chain for ChatGPT prompt input */
+/** Selector fallback chain for Gemini prompt input */
 const PROMPT_SELECTORS = [
-  "#prompt-textarea",
-  '[data-testid="prompt-textarea"]',
-  'div[contenteditable="true"][id*="prompt"]',
-  "form div[contenteditable='true']",
-  "form textarea",
+  'div[contenteditable="true"].ql-editor',
+  'rich-textarea div[contenteditable="true"]',
+  'div[contenteditable="true"][aria-label*="message" i]',
+  'div[contenteditable="true"][aria-label*="prompt" i]',
+  'div[contenteditable="true"]',
+  "textarea",
 ];
 
-/** Selector fallback chain for button anchor (input container) */
+/** Selector fallback chain for button anchor */
 const ANCHOR_SELECTORS = [
-  '[data-testid="prompt-textarea"]',
-  "#prompt-textarea",
-  "form div[contenteditable='true']",
-  "form textarea",
+  'div[contenteditable="true"].ql-editor',
+  'rich-textarea div[contenteditable="true"]',
+  'div[contenteditable="true"]',
+  "textarea",
 ];
 
 /** Max messages to extract from DOM */
@@ -32,27 +33,9 @@ function query(selectors: string[]): HTMLElement | null {
   return null;
 }
 
-function queryAll(selectors: string[]): HTMLElement[] {
-  for (const sel of selectors) {
-    try {
-      const els = Array.from(document.querySelectorAll<HTMLElement>(sel));
-      if (els.length > 0) return els;
-    } catch {
-      // Invalid selector — skip
-    }
-  }
-  return [];
-}
-
-/**
- * Insert text into a contentEditable element using the most robust
- * strategy available: selectAll + execCommand('insertText') first,
- * then fall back to textContent + input event dispatch.
- */
 function insertIntoContentEditable(el: HTMLElement, text: string): void {
   el.focus();
 
-  // Try execCommand approach — works with ProseMirror/React state
   const selection = window.getSelection();
   if (selection) {
     selection.selectAllChildren(el);
@@ -64,39 +47,56 @@ function insertIntoContentEditable(el: HTMLElement, text: string): void {
     if (inserted) return;
   }
 
-  // Fallback: direct textContent mutation + event dispatch
   el.textContent = text;
   el.dispatchEvent(new InputEvent("input", { bubbles: true }));
 }
 
 /**
- * Extract conversation history from the ChatGPT DOM.
- * Primary: data-message-author-role attributes.
- * Fallback: any [data-message-author-role] element, read role attribute.
+ * Extract conversation history from the Gemini DOM.
+ *
+ * Primary: .user-query-text / .user-message for user,
+ *   .model-response-text / .response-content for assistant.
+ * Fallback: message-content, .conversation-turn in DOM order,
+ *   alternating user/assistant.
  */
 function getConversationHistoryFromDOM(): Message[] {
-  // Primary: get all message elements with known role attribute
-  const allMessages = Array.from(
-    document.querySelectorAll<HTMLElement>("[data-message-author-role]")
+  type RawMsg = { el: HTMLElement; role: "user" | "assistant" };
+  const raw: RawMsg[] = [];
+
+  // Strategy 1: role-specific selectors
+  const userEls = Array.from(
+    document.querySelectorAll<HTMLElement>(
+      ".user-query-text, .user-message, [data-role='user']"
+    )
+  );
+  const assistantEls = Array.from(
+    document.querySelectorAll<HTMLElement>(
+      ".model-response-text, .response-content, [data-role='assistant'], [data-role='model']"
+    )
   );
 
-  if (allMessages.length > 0) {
-    const history: Message[] = allMessages
-      .map((el) => {
-        const role = el.getAttribute("data-message-author-role");
-        const content = el.textContent?.trim() ?? "";
-        if (!content || (role !== "user" && role !== "assistant")) return null;
-        return { role: role as "user" | "assistant", content };
-      })
-      .filter((m): m is Message => m !== null);
-    return history.slice(-MAX_HISTORY);
+  if (userEls.length > 0 || assistantEls.length > 0) {
+    userEls.forEach((el) => raw.push({ el, role: "user" }));
+    assistantEls.forEach((el) => raw.push({ el, role: "assistant" }));
+
+    // Sort by DOM position
+    raw.sort((a, b) => {
+      const pos = a.el.compareDocumentPosition(b.el);
+      return pos & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+    });
+
+    return raw
+      .map(({ el, role }) => ({ role, content: el.textContent?.trim() ?? "" }))
+      .filter((m) => m.content.length > 0)
+      .slice(-MAX_HISTORY);
   }
 
-  // Fallback: alternate user/assistant by DOM order for older markup
-  const fallbackEls = queryAll([
-    '[data-message-author-role]',
-    '.message',
-  ]);
+  // Fallback: generic turn containers, alternate user/assistant by position
+  const fallbackEls = Array.from(
+    document.querySelectorAll<HTMLElement>(
+      "message-content, .conversation-turn, .chat-turn"
+    )
+  );
   if (fallbackEls.length > 0) {
     return fallbackEls
       .slice(-MAX_HISTORY)
@@ -110,10 +110,10 @@ function getConversationHistoryFromDOM(): Message[] {
   return [];
 }
 
-export const chatgptAdapter: SiteAdapter = {
-  id: "chatgpt",
-  name: "ChatGPT",
-  urlPattern: /^https:\/\/(chat\.openai\.com|chatgpt\.com)/,
+export const geminiAdapter: SiteAdapter = {
+  id: "gemini",
+  name: "Gemini",
+  urlPattern: /^https:\/\/gemini\.google\.com/,
 
   detect(): boolean {
     return this.urlPattern.test(window.location.origin);
@@ -135,7 +135,6 @@ export const chatgptAdapter: SiteAdapter = {
     if (!el) return;
 
     if (el instanceof HTMLTextAreaElement) {
-      // Native textarea: set value + trigger React's synthetic event
       const nativeSetter = Object.getOwnPropertyDescriptor(
         HTMLTextAreaElement.prototype,
         "value"

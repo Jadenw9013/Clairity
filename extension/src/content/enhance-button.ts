@@ -210,12 +210,24 @@ export function injectEnhanceButton(
     if (!prompt) return;
 
     const conversationId = getConversationId();
+
+    // Extract DOM history — most accurate source; dedup by trimmed content
+    const domHistory = adapter.getConversationHistory();
+    const seen = new Set<string>();
+    const history = domHistory.filter((m) => {
+      const key = `${m.role}:${m.content.trim()}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return m.content.trim().length > 0;
+    });
+
     setLoading(true);
+
 
     try {
       const response = await chrome.runtime.sendMessage({
         type: "REWRITE_PROMPT",
-        payload: { prompt, site: adapter.id as Site, conversationId },
+        payload: { prompt, site: adapter.id as Site, history, conversationId },
       });
 
       if (!response) {

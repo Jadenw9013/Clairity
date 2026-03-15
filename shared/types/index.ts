@@ -57,6 +57,9 @@ export interface SiteAdapter {
   /** Find the insertion point for the Enhance button */
   getButtonAnchor(): HTMLElement | null;
 
+  /** Read existing conversation messages from the page DOM. Returns [] if none found. */
+  getConversationHistory(): Message[];
+
   /** Clean up when adapter is deactivated */
   destroy(): void;
 }
@@ -77,6 +80,7 @@ export interface HealthResponse {
 
 /** Message types for chrome.runtime messaging */
 export type ExtensionMessage =
-  | { type: "REWRITE_PROMPT"; payload: { prompt: string; site: Site; history: Message[] } }
+  | { type: "REWRITE_PROMPT"; payload: { prompt: string; site: Site; history: Message[]; conversationId: string } }
   | { type: "REWRITE_RESULT"; payload: RewriteResponse }
   | { type: "REWRITE_ERROR"; payload: ErrorResponse };
+

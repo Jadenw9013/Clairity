@@ -1,10 +1,12 @@
 import type { SiteAdapter } from "shared/types/index.ts";
 import { chatgptAdapter } from "./chatgpt.js";
 import { claudeAdapter } from "./claude.js";
+import { geminiAdapter } from "./gemini.js";
 
 const OBSERVER_TIMEOUT_MS = 30_000;
 
-const adapters: SiteAdapter[] = [chatgptAdapter, claudeAdapter];
+const adapters: SiteAdapter[] = [chatgptAdapter, claudeAdapter, geminiAdapter];
+
 
 /** Detect which adapter matches the current page */
 export function detectAdapter(): SiteAdapter | null {
