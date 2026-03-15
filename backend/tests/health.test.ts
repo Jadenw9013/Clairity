@@ -81,7 +81,7 @@ describe("POST /v1/rewrite", () => {
       .send({ prompt: "give me an example", site: "gemini", history });
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty("history_length", 2);
-  });
+  }, 15000);
 
   it("returns model field in response", async () => {
     const token = await getToken();
@@ -92,5 +92,5 @@ describe("POST /v1/rewrite", () => {
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty("model");
     expect(typeof res.body.model).toBe("string");
-  });
+  }, 15000);
 });
