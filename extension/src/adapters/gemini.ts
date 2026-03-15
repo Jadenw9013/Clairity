@@ -85,10 +85,15 @@ function getConversationHistoryFromDOM(): Message[] {
       return pos & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
     });
 
-    return raw
-      .map(({ el, role }) => ({ role, content: el.textContent?.trim() ?? "" }))
-      .filter((m) => m.content.length > 0)
-      .slice(-MAX_HISTORY);
+    const history: Message[] = [];
+    for (let i = raw.length - 1; i >= 0 && history.length < MAX_HISTORY; i--) {
+      const { el, role } = raw[i];
+      const content = el.textContent?.trim() ?? "";
+      if (content.length > 0) {
+        history.unshift({ role, content });
+      }
+    }
+    return history;
   }
 
   // Fallback: generic turn containers, alternate user/assistant by position
@@ -98,13 +103,20 @@ function getConversationHistoryFromDOM(): Message[] {
     )
   );
   if (fallbackEls.length > 0) {
-    return fallbackEls
-      .slice(-MAX_HISTORY)
-      .map((el, i) => ({
-        role: (i % 2 === 0 ? "user" : "assistant") as "user" | "assistant",
-        content: el.textContent?.trim() ?? "",
-      }))
-      .filter((m) => m.content.length > 0);
+    const history: Message[] = [];
+    const startIdx = Math.max(0, fallbackEls.length - MAX_HISTORY);
+    for (let i = fallbackEls.length - 1; i >= startIdx; i--) {
+      const el = fallbackEls[i];
+      const content = el.textContent?.trim() ?? "";
+      if (content.length > 0) {
+        const relativeIdx = i - startIdx;
+        const role = (relativeIdx % 2 === 0 ? "user" : "assistant") as
+          | "user"
+          | "assistant";
+        history.unshift({ role, content });
+      }
+    }
+    return history;
   }
 
   return [];
