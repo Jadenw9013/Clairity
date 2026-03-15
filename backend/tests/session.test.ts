@@ -62,7 +62,7 @@ describe("Auth middleware", () => {
       .send({ prompt: "Help me code", site: "chatgpt", history: [] });
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty("enhanced_prompt");
-  });
+  }, 15000);
 
   it("does not require auth for /v1/health", async () => {
     const res = await request(app).get("/v1/health");

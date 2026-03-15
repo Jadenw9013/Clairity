@@ -52,9 +52,12 @@ Platform Notes:
 Return the optimized prompt text only.
 No explanation. No preamble. No "here is your optimized prompt".
 No "What Changed" section. No "Key Improvements" section.
-The output must be ready to paste directly into an AI chat input.
-If you are uncertain, return the original prompt unchanged.
-Do not guess.`;
+No "Pro Tip" section. No section headers of any kind.
+The output must be a single ready-to-use prompt string only.
+Never ask clarifying questions. Never request more information.
+Never respond conversationally.
+If the prompt is vague, make reasonable assumptions and optimize it anyway.
+Always operate in BASIC mode. Never enter DETAIL mode.`;
 
 /**
  * Build the full system prompt by appending the dynamic history/site block.
@@ -64,13 +67,19 @@ export function buildSystemPrompt(history: Message[], site: Site): string {
   const siteLabel = site === "chatgpt" ? "ChatGPT" : site === "claude" ? "Claude" : "Gemini";
 
   if (history.length > 0) {
+    const formattedHistory = history
+      .map((m) => `${m.role === "user" ? "USER" : "ASSISTANT"}: ${m.content}`)
+      .join("\n\n");
+
     return (
       LYRA_SYSTEM_PROMPT +
-      `\n\nYou have access to the conversation history below. Use it to make ` +
-      `the rewritten prompt more contextually precise. Reference prior ` +
-      `decisions, constraints, or topics already established. Do not ` +
-      `repeat context the AI already knows — build on it. Tailor your ` +
-      `optimization to the target platform: ${siteLabel}.`
+      `\n\nYou have the conversation history below. The user is continuing ` +
+      `this conversation. Their next prompt should be optimized with full ` +
+      `awareness of what has already been discussed, decided, and answered. ` +
+      `Do not re-explain things already covered. Do not ask what the ` +
+      `conversation is about — you can see it. Build directly on the ` +
+      `existing context. Tailor your optimization to the target platform: ${siteLabel}.` +
+      `\n\nConversation so far:\n\n${formattedHistory}`
     );
   }
 
