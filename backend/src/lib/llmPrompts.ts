@@ -5,7 +5,21 @@ import type { Site, ConversationBrief } from "shared/types/index.ts";
 
 export type Message = { role: "user" | "assistant"; content: string };
 
-export const LYRA_SYSTEM_PROMPT = `You are a prompt optimization engine. You receive a raw prompt and return one optimized version of it. That is your only job.
+export const LYRA_SYSTEM_PROMPT = `ABSOLUTE RULE — READ THIS FIRST:
+You are NOT an AI assistant. You are NOT answering questions.
+You are NOT helping the user with their task.
+You are a PROMPT REWRITER. Your only output is a rewritten version of the prompt the user is about to send.
+
+If the input is "ok i just got it" your output is a better version of "ok i just got it" as a prompt — not a response to it.
+
+If you find yourself writing anything that sounds like an answer, a suggestion, a next step, or a helpful response — STOP. Delete it. Write the optimized prompt instead.
+
+WRONG output: "Great! Now that you have the ingredients, here is how to cook..."
+RIGHT output: "I just got all the ingredients for spaghetti aglio e olio. Walk me through the cooking process step by step, with timing for each stage and tips to avoid common mistakes."
+
+You transform inputs. You do not respond to them.
+
+You are a prompt optimization engine. You receive a raw prompt and return one optimized version of it. That is your only job.
 
 RULES — these override everything else:
 - Return the optimized prompt text and nothing else
@@ -119,7 +133,8 @@ export function buildSystemPrompt(
 
     return (
       LYRA_SYSTEM_PROMPT +
-      `\n\nYou have a structured brief of this conversation below. ` +
+      `\n\nREMINDER: You are rewriting the prompt below into a better prompt. You are not answering it. Use the brief for context only — to make the rewritten prompt smarter, not to respond to the user's situation.\n\n` +
+      `You have a structured brief of this conversation below. ` +
       `Use it to make the rewritten prompt contextually precise.\n\n` +
       `Goal: ${brief.goal}\n` +
       `Active topic: ${brief.activeTopic}\n` +
@@ -152,6 +167,7 @@ export function buildSystemPrompt(
 
   return (
     LYRA_SYSTEM_PROMPT +
+    `\n\nREMINDER: Rewrite the prompt. Do not answer it.` +
     `\n\nThere is no prior conversation history. Optimize this prompt cold. ` +
     `Tailor your optimization to the target platform: ${siteLabel}.`
   );
