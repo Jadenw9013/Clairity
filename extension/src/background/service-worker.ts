@@ -86,6 +86,7 @@ interface RewriteMessage {
     prompt: string;
     site: "chatgpt" | "claude" | "gemini";
     conversationId: string;
+    history?: Message[];
   };
 }
 
@@ -116,12 +117,14 @@ async function handleRewrite(
   | { type: "REWRITE_RESULT"; payload: RewriteResponse }
   | { type: "REWRITE_ERROR"; payload: ErrorResponse }
 > {
-  const { prompt, site, conversationId } = payload;
+  const { prompt, site, conversationId, history: domHistory } = payload;
 
   try {
-    // Load history for this conversation before calling the backend
-    const history = await getHistory(conversationId);
-    devLog(`History for ${conversationId}: ${history.length} messages`);
+    // Prefer DOM history (extracted live from the page) over session store.
+    // Session store is a fallback for when DOM extraction returns nothing.
+    const sessionHistory = await getHistory(conversationId);
+    const history = (domHistory && domHistory.length > 0) ? domHistory : sessionHistory;
+    devLog(`History for ${conversationId}: ${history.length} messages (source: ${domHistory && domHistory.length > 0 ? 'DOM' : 'session'})`);
 
     let token = await getSessionToken();
     let res = await callRewrite(prompt, history, site, token);
