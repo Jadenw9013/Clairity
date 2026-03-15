@@ -1,85 +1,27 @@
+// shared/types/index.ts
+// Shared TypeScript types used by both extension and backend.
+
 /** Supported AI chat sites */
 export type Site = "chatgpt" | "claude" | "gemini";
 
-/** Conversation context type */
-export type ConversationType = "new" | "continuing";
-
-/** Prompt rewrite mode */
-export type RewriteMode = "enhance" | "restructure" | "expand";
-
-/** Intent category detected from prompt analysis */
-export type PromptIntent =
-  | "coding"
-  | "writing"
-  | "research"
-  | "career"
-  | "general";
-
-/** Tone preset for rewrite output */
-export type RewriteTone = "concise" | "detailed" | "professional";
-
-/** Output format preset */
-export type OutputFormat = "paragraph" | "bullets" | "step-by-step" | "json" | "code";
-
-/** User-selected presets sent with rewrite request */
-export interface RewritePreset {
-  intent?: PromptIntent;
-  tone?: RewriteTone;
-  output_format?: OutputFormat;
-  additional_context?: string;
+/** A single message in the conversation history */
+export interface Message {
+  role: "user" | "assistant";
+  content: string;
 }
 
 /** Request body for POST /v1/rewrite */
 export interface RewriteRequest {
   prompt: string;
-  context: {
-    site: Site;
-    conversation_type?: ConversationType;
-    language?: string;
-  };
-  options?: {
-    mode?: RewriteMode;
-    preserve_intent?: boolean;
-    max_length?: number;
-  };
-  preset?: RewritePreset;
-}
-
-/** Quality score breakdown for a rewritten prompt */
-export interface PromptScore {
-  clarity: number;
-  specificity: number;
-  constraints: number;
-  overall: number;
-  confidence: number;
-}
-
-/** A single change made during rewrite */
-export interface PromptChange {
-  type: "added" | "modified" | "restructured";
-  description: string;
+  history: Message[];
+  site: Site;
 }
 
 /** Successful response from POST /v1/rewrite */
 export interface RewriteResponse {
   enhanced_prompt: string;
-  score: PromptScore;
-  changes: PromptChange[];
-  warnings: string[];
-  clarifying_question?: string;
-  metadata: {
-    model_used: string;
-    tokens_used: {
-      input: number;
-      output: number;
-    };
-    rewrite_mode: RewriteMode;
-    processing_time_ms: number;
-    detected_intent: PromptIntent;
-    /** MCS context enrichment status (only present when MCS integration is configured) */
-    mcs_context?: Record<string, unknown>;
-  };
-  request_id: string;
+  history_length: number;
+  model: string;
 }
 
 /** Standard error response from all endpoints */
@@ -135,8 +77,6 @@ export interface HealthResponse {
 
 /** Message types for chrome.runtime messaging */
 export type ExtensionMessage =
-  | { type: "REWRITE_PROMPT"; payload: { prompt: string; site: Site; preset?: RewritePreset } }
+  | { type: "REWRITE_PROMPT"; payload: { prompt: string; site: Site; history: Message[] } }
   | { type: "REWRITE_RESULT"; payload: RewriteResponse }
   | { type: "REWRITE_ERROR"; payload: ErrorResponse };
-
-export * from "./quality.js";

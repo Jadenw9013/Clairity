@@ -30,20 +30,13 @@ describe("POST /v1/rewrite", () => {
       .set("Authorization", `Bearer ${token}`)
       .send({
         prompt: "Help me write a function",
-        context: { site: "chatgpt" },
+        history: [],
+        site: "chatgpt",
       });
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty("enhanced_prompt");
-    expect(res.body).toHaveProperty("score");
-    expect(res.body.score).toHaveProperty("clarity");
-    expect(res.body.score).toHaveProperty("confidence");
-    expect(res.body).toHaveProperty("changes");
-    expect(res.body).toHaveProperty("warnings");
-    expect(res.body).toHaveProperty("metadata");
-    expect(res.body.metadata).toHaveProperty("model_used", "deterministic-v1");
-    expect(res.body.metadata).toHaveProperty("rewrite_mode", "enhance");
-    expect(res.body.metadata).toHaveProperty("detected_intent");
-    expect(res.body).toHaveProperty("request_id");
+    expect(res.body).toHaveProperty("history_length", 0);
+    expect(res.body).toHaveProperty("model");
   });
 
   it("returns 400 when prompt is missing", async () => {
@@ -51,7 +44,7 @@ describe("POST /v1/rewrite", () => {
     const res = await request(app)
       .post("/v1/rewrite")
       .set("Authorization", `Bearer ${token}`)
-      .send({ context: { site: "chatgpt" } });
+      .send({ site: "chatgpt", history: [] });
     expect(res.status).toBe(400);
     expect(res.body).toHaveProperty("code", "VALIDATION_ERROR");
   });
@@ -61,7 +54,7 @@ describe("POST /v1/rewrite", () => {
     const res = await request(app)
       .post("/v1/rewrite")
       .set("Authorization", `Bearer ${token}`)
-      .send({ prompt: "test", context: { site: "invalid" } });
+      .send({ prompt: "test", site: "invalid", history: [] });
     expect(res.status).toBe(400);
     expect(res.body).toHaveProperty("code", "VALIDATION_ERROR");
   });
@@ -71,43 +64,33 @@ describe("POST /v1/rewrite", () => {
     const res = await request(app)
       .post("/v1/rewrite")
       .set("Authorization", `Bearer ${token}`)
-      .send({ prompt: "", context: { site: "claude" } });
+      .send({ prompt: "", site: "claude", history: [] });
     expect(res.status).toBe(400);
     expect(res.body).toHaveProperty("code", "VALIDATION_ERROR");
   });
 
-  it("respects rewrite mode option", async () => {
+  it("respects history field", async () => {
     const token = await getToken();
+    const history = [
+      { role: "user", content: "explain closures" },
+      { role: "assistant", content: "A closure captures its lexical scope." },
+    ];
     const res = await request(app)
       .post("/v1/rewrite")
       .set("Authorization", `Bearer ${token}`)
-      .send({
-        prompt: "Help me",
-        context: { site: "gemini" },
-        options: { mode: "expand" },
-      });
+      .send({ prompt: "give me an example", site: "gemini", history });
     expect(res.status).toBe(200);
-    expect(res.body.metadata.rewrite_mode).toBe("expand");
+    expect(res.body).toHaveProperty("history_length", 2);
   });
 
-  it("accepts preset fields", async () => {
+  it("returns model field in response", async () => {
     const token = await getToken();
     const res = await request(app)
       .post("/v1/rewrite")
       .set("Authorization", `Bearer ${token}`)
-      .send({
-        prompt: "Help me write a REST API",
-        context: { site: "chatgpt" },
-        preset: {
-          intent: "coding",
-          tone: "professional",
-          output_format: "step-by-step",
-          additional_context: "Using Node.js and Express",
-        },
-      });
+      .send({ prompt: "Help me write a REST API", site: "claude", history: [] });
     expect(res.status).toBe(200);
-    expect(res.body.metadata.detected_intent).toBe("coding");
-    expect(res.body.enhanced_prompt).toContain("Using Node.js and Express");
-    expect(res.body.enhanced_prompt).toContain("step-by-step");
+    expect(res.body).toHaveProperty("model");
+    expect(typeof res.body.model).toBe("string");
   });
 });

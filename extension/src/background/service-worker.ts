@@ -1,12 +1,16 @@
 import type {
-  RewriteRequest,
   RewriteResponse,
   ErrorResponse,
   SessionResponse,
-  RewritePreset,
+  Message,
 } from "shared/types/index.ts";
 
 import { API_BASE } from "../config.js";
+import {
+  getHistory,
+  appendUserMessage,
+  appendAssistantMessage,
+} from "../lib/conversationStore.js";
 
 declare const __CLAIRITY_DEV__: boolean;
 const isDev = typeof __CLAIRITY_DEV__ !== "undefined" && __CLAIRITY_DEV__;
@@ -30,7 +34,6 @@ async function apiFetch(url: string, init: RequestInit): Promise<Response> {
   try {
     const res = await fetch(url, { ...init, signal: controller.signal });
     devLog(`← ${res.status} ${res.statusText} (${url})`);
-    // Log error response bodies in dev (truncated, never tokens)
     if (isDev && res.status >= 400) {
       const clone = res.clone();
       try {
@@ -53,7 +56,7 @@ let tokenExpiresAt = 0;
 
 async function getSessionToken(): Promise<string> {
   if (cachedToken && Date.now() < tokenExpiresAt - 60_000) {
-    devLog(`Token cached (length: ${cachedToken.length}, expires in ${Math.round((tokenExpiresAt - Date.now()) / 1000)}s)`);
+    devLog(`Token cached (length: ${cachedToken.length})`);
     return cachedToken;
   }
 
@@ -66,7 +69,7 @@ async function getSessionToken(): Promise<string> {
   const data = (await res.json()) as SessionResponse;
   cachedToken = data.token;
   tokenExpiresAt = new Date(data.expires_at).getTime();
-  devLog(`Token obtained (length: ${cachedToken.length}, expires: ${data.expires_at})`);
+  devLog(`Token obtained (expires: ${data.expires_at})`);
   return cachedToken;
 }
 
@@ -81,8 +84,8 @@ interface RewriteMessage {
   type: "REWRITE_PROMPT";
   payload: {
     prompt: string;
-    site: RewriteRequest["context"]["site"];
-    preset?: RewritePreset;
+    site: "chatgpt" | "claude" | "gemini";
+    conversationId: string;
   };
 }
 
@@ -92,24 +95,18 @@ type IncomingMessage =
   | { type: "CLAIRITY_DIAGNOSE" };
 
 async function callRewrite(
-  payload: RewriteMessage["payload"],
+  prompt: string,
+  history: Message[],
+  site: string,
   token: string
 ): Promise<Response> {
-  const body: RewriteRequest = {
-    prompt: payload.prompt,
-    context: { site: payload.site },
-    preset: payload.preset,
-  };
-
-  devLog("Rewrite request body:", JSON.stringify(body));
-
   return apiFetch(`${API_BASE}/rewrite`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ prompt, history, site }),
   });
 }
 
@@ -119,16 +116,22 @@ async function handleRewrite(
   | { type: "REWRITE_RESULT"; payload: RewriteResponse }
   | { type: "REWRITE_ERROR"; payload: ErrorResponse }
 > {
-  try {
-    let token = await getSessionToken();
-    let res = await callRewrite(payload, token);
+  const { prompt, site, conversationId } = payload;
 
-    // If 401, token may have expired — refresh once and retry
+  try {
+    // Load history for this conversation before calling the backend
+    const history = await getHistory(conversationId);
+    devLog(`History for ${conversationId}: ${history.length} messages`);
+
+    let token = await getSessionToken();
+    let res = await callRewrite(prompt, history, site, token);
+
+    // If 401, refresh token once and retry
     if (res.status === 401) {
-      devWarn("Got 401, refreshing token and retrying...");
+      devWarn("Got 401, refreshing token...");
       clearCachedToken();
       token = await getSessionToken();
-      res = await callRewrite(payload, token);
+      res = await callRewrite(prompt, history, site, token);
     }
 
     if (!res.ok) {
@@ -137,7 +140,13 @@ async function handleRewrite(
     }
 
     const data = (await res.json()) as RewriteResponse;
-    devLog(`Rewrite success: enhanced_prompt length=${data.enhanced_prompt.length}, score=${data.score?.overall}`);
+    devLog(`Rewrite success: enhanced_prompt length=${data.enhanced_prompt.length}`);
+
+    // Store the user message now (after successful rewrite)
+    await appendUserMessage(conversationId, prompt);
+    // Store the enhanced prompt as the "assistant" turn for context continuity
+    await appendAssistantMessage(conversationId, data.enhanced_prompt);
+
     return { type: "REWRITE_RESULT", payload: data };
   } catch (err: unknown) {
     const isAbort = err instanceof DOMException && err.name === "AbortError";
@@ -162,27 +171,26 @@ async function runDiagnostics(): Promise<Record<string, unknown>> {
     isDev,
   };
 
-  // Step 1: Session
   try {
     const token = await getSessionToken();
     report.session = { status: "ok", token_length: token.length };
   } catch (err) {
     report.session = { status: "error", error: err instanceof Error ? err.message : String(err) };
-    return report; // Can't continue without token
+    return report;
   }
 
-  // Step 2: Rewrite
   try {
     const result = await handleRewrite({
       prompt: "help me write better code",
       site: "chatgpt",
+      conversationId: "diagnostics",
     });
     if (result.type === "REWRITE_RESULT") {
       report.rewrite = {
         status: "ok",
         enhanced_prompt_length: result.payload.enhanced_prompt.length,
-        score_overall: result.payload.score?.overall,
-        changes_count: result.payload.changes?.length,
+        history_length: result.payload.history_length,
+        model: result.payload.model,
       };
     } else {
       report.rewrite = { status: "error", error: result.payload };
@@ -198,7 +206,7 @@ async function runDiagnostics(): Promise<Record<string, unknown>> {
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name === "keepalive") {
     port.onDisconnect.addListener(() => {
-      // Popup closed or navigated away; nothing to clean up.
+      // Popup closed; nothing to clean up.
     });
   }
 });

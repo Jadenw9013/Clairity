@@ -7,6 +7,17 @@ import panelCss from "./panel.css?inline";
 
 const BUTTON_ID = "clairity-enhance-root";
 
+/** Derive a stable conversationId from the current tab URL. */
+function getConversationId(): string {
+  try {
+    const url = new URL(window.location.href);
+    // Use origin + pathname (stable across query param changes in SPA sites)
+    return url.origin + url.pathname;
+  } catch {
+    return "default";
+  }
+}
+
 export function injectEnhanceButton(
   adapter: SiteAdapter,
   anchor: HTMLElement
@@ -29,19 +40,30 @@ export function injectEnhanceButton(
   // Trigger Button
   const btn = document.createElement("button");
   btn.className = "cl-trigger cl-btn-ai";
-
-  let currentTitle = "Fix my question";
-  btn.textContent = currentTitle;
+  btn.textContent = "Fix my question";
   btn.setAttribute("aria-label", "Enhance prompt");
   btn.type = "button";
   shadow.appendChild(btn);
 
-  chrome.storage.local.get(["uxMode"], (res) => {
-    if (res.uxMode === "advanced") {
-      currentTitle = "Enhance Request";
-      btn.textContent = currentTitle;
-    }
-  });
+  // Transparency chip (hidden until first successful enhance)
+  const chip = document.createElement("div");
+  chip.style.cssText = `
+    display: none;
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--clr-text-light, #6b7280);
+    font-style: italic;
+    white-space: nowrap;
+  `;
+  shadow.appendChild(chip);
+
+  const showChip = (historyLength: number) => {
+    chip.textContent =
+      historyLength === 0
+        ? "✦ Enhanced · first prompt"
+        : `✦ Enhanced · ${historyLength} messages used`;
+    chip.style.display = "block";
+  };
 
   // Helper to show a mini toast for Undo
   const showUndoToast = (originalText: string) => {
@@ -83,9 +105,7 @@ export function injectEnhanceButton(
         font-size: 12px;
       `;
       undoBtn.addEventListener("click", () => {
-        // Restore original text
         adapter.setPromptText(originalText);
-        // Dispatch events to trigger host site reactivity
         const el = adapter.getPromptElement();
         if (el) {
           el.dispatchEvent(new Event("input", { bubbles: true }));
@@ -111,7 +131,6 @@ export function injectEnhanceButton(
       toast.appendChild(closeBtn);
       shadow.appendChild(toast);
 
-      // Auto-hide after 10 seconds
       setTimeout(() => {
         if (toast?.parentNode) toast.remove();
       }, 10000);
@@ -122,7 +141,8 @@ export function injectEnhanceButton(
     const prompt = adapter.getPromptText().trim();
     if (!prompt) return;
 
-    let originalPromptText = prompt;
+    const originalPromptText = prompt;
+    const conversationId = getConversationId();
 
     btn.disabled = true;
     btn.textContent = "Enhancing...";
@@ -131,7 +151,7 @@ export function injectEnhanceButton(
     try {
       const response = await chrome.runtime.sendMessage({
         type: "REWRITE_PROMPT",
-        payload: { prompt, site: adapter.id as Site },
+        payload: { prompt, site: adapter.id as Site, conversationId },
       });
 
       if (!response) {
@@ -139,17 +159,17 @@ export function injectEnhanceButton(
       } else if (response.type === "REWRITE_RESULT") {
         const data = response.payload as RewriteResponse;
 
-        // Immediately replace prompt
         adapter.setPromptText(data.enhanced_prompt);
 
-        // Dispatch events
         const el = adapter.getPromptElement();
         if (el) {
           el.dispatchEvent(new Event("input", { bubbles: true }));
           el.dispatchEvent(new Event("change", { bubbles: true }));
         }
 
-        // Show undo toast
+        // Show transparency chip
+        showChip(data.history_length);
+
         showUndoToast(originalPromptText);
 
       } else if (response.type === "REWRITE_ERROR") {
@@ -160,7 +180,6 @@ export function injectEnhanceButton(
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Unknown error";
-      // Show error in a mini toast
       let toast = shadow.getElementById("clairity-error-toast");
       if (!toast) {
         toast = document.createElement("div");
@@ -185,7 +204,7 @@ export function injectEnhanceButton(
       }
     } finally {
       btn.disabled = false;
-      btn.textContent = currentTitle;
+      btn.textContent = "Fix my question";
       btn.classList.remove("is-loading");
     }
   };
