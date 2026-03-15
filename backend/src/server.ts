@@ -1,4 +1,10 @@
+// Load .env first — must be before any import that reads process.env at module level.
+// process.loadEnvFile() is built-in to Node ≥20.6. Safe to call in CI (throws if file missing,
+// which the catch silently ignores — CI/production sets vars via real env instead).
+try { process.loadEnvFile(new URL("../.env", import.meta.url)); } catch { /* no .env file — OK */ }
+
 import express from "express";
+
 import cors from "cors";
 import pinoHttp from "pino-http";
 import healthRouter from "./routes/v1/health.js";
