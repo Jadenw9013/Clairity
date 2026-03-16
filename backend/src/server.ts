@@ -123,7 +123,7 @@ const isDirectRun =
   process.argv[1] &&
   import.meta.url.endsWith(process.argv[1].replace(/\\/g, "/"));
 if (isDirectRun) {
-  app.listen(PORT, () => {
+  app.listen(PORT, "0.0.0.0", () => {
     logger.info({ port: PORT, env: NODE_ENV }, "Clairity backend started");
   });
 }

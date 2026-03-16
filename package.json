@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "concurrently --kill-others-on-fail --prefix-colors \"bgBlue.bold,bgGreen.bold\" --names \"BACKEND,EXTENSION\" \"npm run dev --workspace=backend\" \"npm run dev --workspace=extension\"",
     "build": "npm run build --workspace=shared && npm run build --workspace=backend && npm run build --workspace=extension",
+    "start": "node backend/dist/backend/src/server.js",
     "test": "npm test --workspace=backend",
     "typecheck": "npm run typecheck --workspace=backend"
   },
