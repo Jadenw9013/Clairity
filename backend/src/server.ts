@@ -98,7 +98,7 @@ app.set("trust proxy", NODE_ENV === "production" ? 1 : false);
 
 // Global middleware
 app.use(cors({ origin: corsOriginCallback }));
-app.use(express.json({ limit: "10kb" }));
+app.use(express.json({ limit: "50kb" }));
 app.use(
   pinoHttp({
     logger,
