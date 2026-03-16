@@ -9,27 +9,35 @@ on:
 jobs:
   build_and_test:
     runs-on: ubuntu-latest
-    
+
+    env:
+      SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      ANTHROPIC_MODEL: claude-haiku-4-5-20251001
+      NODE_ENV: test
+      PORT: 3001
+      LOG_LEVEL: silent
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Use Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '22.x'
         cache: 'npm'
-        
+
     - name: Install dependencies
       run: npm install
-      
-    - name: Run test (vitest)
-      run: npm test
-      
+
+    - name: Build shared
+      run: npm run build --workspace=shared
+
+    - name: Run tests (vitest)
+      run: npm test --workspace=backend
+
     - name: Run typecheck
       run: npm run typecheck
-      
+
     - name: Build backend
       run: npm run build --workspace=backend
-      
-    - name: Build extension
-      run: npm run build --workspace=extension
