@@ -72,4 +72,24 @@ describe("callLyra", () => {
     expect(result.enhanced_prompt).toBe("test prompt");
     expect(result.model).toBe("fallback");
   });
+
+  it("forwards x-api-key to callLlm when provided in LyraInput", async () => {
+    mockCallLlm.mockResolvedValue({ content: "Enhanced", model: "claude-haiku-4-5-20251001" });
+
+    await callLyra({ prompt: "test", history: [], site: "claude", apiKey: "sk-ant-test-key" });
+
+    // Second arg to callLlm should be the user's api key
+    const apiKeyArg = mockCallLlm.mock.calls[0]![1] as string | undefined;
+    expect(apiKeyArg).toBe("sk-ant-test-key");
+  });
+
+  it("passes undefined to callLlm when no apiKey in LyraInput (env fallback)", async () => {
+    mockCallLlm.mockResolvedValue({ content: "Enhanced", model: "claude-haiku-4-5-20251001" });
+
+    await callLyra({ prompt: "test", history: [], site: "claude" });
+
+    // Second arg should be undefined — backend uses env key
+    const apiKeyArg = mockCallLlm.mock.calls[0]![1] as string | undefined;
+    expect(apiKeyArg).toBeUndefined();
+  });
 });

@@ -17,6 +17,7 @@ import {
   shouldExtractBrief,
   shouldUpdateBrief,
 } from "../lib/conversationStore.js";
+import { getApiKey } from "../lib/apiKeyStore.js";
 
 declare const __CLAIRITY_DEV__: boolean;
 const isDev = typeof __CLAIRITY_DEV__ !== "undefined" && __CLAIRITY_DEV__;
@@ -112,7 +113,8 @@ async function callRewrite(
   history: Message[],
   site: string,
   token: string,
-  brief: ConversationBrief | null
+  brief: ConversationBrief | null,
+  apiKey: string
 ): Promise<Response> {
   const body: Record<string, unknown> = { prompt, history, site };
   if (brief) body["brief"] = brief;
@@ -122,6 +124,7 @@ async function callRewrite(
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
+      "x-api-key": apiKey,
     },
     body: JSON.stringify(body),
   });
@@ -134,7 +137,8 @@ async function callRewrite(
 function triggerBriefExtraction(
   conversationId: string,
   history: Message[],
-  token: string
+  token: string,
+  apiKey: string
 ): void {
   (async () => {
     try {
@@ -143,6 +147,7 @@ function triggerBriefExtraction(
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
+          "x-api-key": apiKey,
         },
         body: JSON.stringify({ history }),
       });
@@ -166,7 +171,8 @@ function triggerBriefUpdate(
   conversationId: string,
   currentBrief: ConversationBrief,
   newMessages: Message[],
-  token: string
+  token: string,
+  apiKey: string
 ): void {
   (async () => {
     try {
@@ -175,6 +181,7 @@ function triggerBriefUpdate(
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
+          "x-api-key": apiKey,
         },
         body: JSON.stringify({ currentBrief, newMessages }),
       });
@@ -198,6 +205,18 @@ async function handleRewrite(
 > {
   const { prompt, site, conversationId, history: domHistory } = payload;
 
+  // Guard: API key must be set before any backend call
+  const apiKey = await getApiKey();
+  if (!apiKey) {
+    return {
+      type: "REWRITE_ERROR",
+      payload: {
+        error: "Add your Anthropic API key in the Clairity popup to enhance prompts.",
+        code: "NO_API_KEY",
+      },
+    };
+  }
+
   try {
     // Prefer DOM history (extracted live from the page) over session store.
     const sessionHistory = await getHistory(conversationId);
@@ -209,14 +228,14 @@ async function handleRewrite(
     devLog(`Brief for ${conversationId}: ${brief ? "active" : "none"}`);
 
     let token = await getSessionToken();
-    let res = await callRewrite(prompt, history, site, token, brief);
+    let res = await callRewrite(prompt, history, site, token, brief, apiKey);
 
     // If 401, refresh token once and retry
     if (res.status === 401) {
       devWarn("Got 401, refreshing token...");
       clearCachedToken();
       token = await getSessionToken();
-      res = await callRewrite(prompt, history, site, token, brief);
+      res = await callRewrite(prompt, history, site, token, brief, apiKey);
     }
 
     if (!res.ok) {
@@ -235,14 +254,14 @@ async function handleRewrite(
     // Fire-and-forget brief operations based on current state
     if (await shouldExtractBrief(conversationId)) {
       devLog("Triggering brief extraction (fire-and-forget)");
-      triggerBriefExtraction(conversationId, history, token);
+      triggerBriefExtraction(conversationId, history, token, apiKey);
     } else if (brief && (await shouldUpdateBrief(conversationId))) {
       devLog("Triggering brief update (fire-and-forget)");
       const newMessages: Message[] = [
         { role: "user", content: prompt },
         { role: "assistant", content: data.enhanced_prompt },
       ];
-      triggerBriefUpdate(conversationId, brief, newMessages, token);
+      triggerBriefUpdate(conversationId, brief, newMessages, token, apiKey);
     }
 
     return {

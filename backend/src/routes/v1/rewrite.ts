@@ -32,8 +32,9 @@ const router = Router();
 
 router.post("/rewrite", validate(rewriteSchema), async (req, res) => {
   const { prompt, history, site, brief } = req.body as z.infer<typeof rewriteSchema>;
+  const userApiKey = req.headers["x-api-key"] as string | undefined;
 
-  const result = await callLyra({ prompt, history, site, brief });
+  const result = await callLyra({ prompt, history, site, brief, apiKey: userApiKey });
 
   res.json({
     enhanced_prompt: result.enhanced_prompt,

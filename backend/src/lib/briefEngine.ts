@@ -55,7 +55,7 @@ function parseBriefJson(raw: string, messageCount: number): ConversationBrief | 
  * Called once after messageCount >= 6.
  * Returns null on any LLM failure — caller keeps using raw history.
  */
-export async function extractBrief(history: Message[]): Promise<ConversationBrief | null> {
+export async function extractBrief(history: Message[], apiKey?: string): Promise<ConversationBrief | null> {
   const formattedHistory = history
     .map((m) => `${m.role === "user" ? "USER" : "ASSISTANT"}: ${m.content}`)
     .join("\n\n");
@@ -69,7 +69,7 @@ export async function extractBrief(history: Message[]): Promise<ConversationBrie
       },
     ],
     maxTokens: BRIEF_MAX_TOKENS,
-  });
+  }, apiKey);
 
   if (!result) {
     logger.info({ module: "briefEngine" }, "extractBrief: LLM unavailable — returning null");
@@ -93,7 +93,8 @@ export async function extractBrief(history: Message[]): Promise<ConversationBrie
  */
 export async function updateBrief(
   currentBrief: ConversationBrief,
-  newMessages: Message[]
+  newMessages: Message[],
+  apiKey?: string
 ): Promise<ConversationBrief> {
   const currentBriefJson = JSON.stringify(
     {
@@ -118,7 +119,7 @@ export async function updateBrief(
     system: UPDATE_BRIEF_PROMPT,
     messages: [{ role: "user", content: userContent }],
     maxTokens: BRIEF_MAX_TOKENS,
-  });
+  }, apiKey);
 
   if (!result) {
     logger.info({ module: "briefEngine" }, "updateBrief: LLM unavailable — returning current brief");

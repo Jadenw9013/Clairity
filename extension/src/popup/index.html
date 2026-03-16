@@ -70,6 +70,31 @@
         placeholder="Add background info, constraints, or goals..."></textarea>
     </div>
 
+    <!-- API Key section -->
+    <div id="apikey-section" class="cl-card apikey-card">
+      <!-- STATE A: no key set -->
+      <div id="apikey-state-a">
+        <label for="apikey-input" class="apikey-label">Anthropic API Key</label>
+        <div class="apikey-row">
+          <input id="apikey-input" type="password" class="cl-input apikey-input"
+            placeholder="sk-ant-..." autocomplete="off" spellcheck="false" />
+          <button id="apikey-save" type="button" class="cl-btn-sm">Save</button>
+        </div>
+        <div id="apikey-error" class="apikey-error hidden">Invalid key format — must start with sk-ant-</div>
+        <a href="https://console.anthropic.com" target="_blank" class="cl-link apikey-help">
+          Get your key at console.anthropic.com ↗
+        </a>
+      </div>
+      <!-- STATE B: key set -->
+      <div id="apikey-state-b" class="hidden">
+        <div class="apikey-saved-row">
+          <span class="apikey-label">API Key</span>
+          <span id="apikey-masked" class="apikey-masked"></span>
+          <button id="apikey-remove" type="button" class="cl-text-btn apikey-remove">Remove</button>
+        </div>
+      </div>
+    </div>
+
     <button id="enhance" type="button" aria-label="Fix my question" class="cl-btn-ai">
       <span class="btn-text">Fix my question</span>
       <span class="btn-spinner hidden"></span>

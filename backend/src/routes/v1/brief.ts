@@ -37,14 +37,16 @@ const updateSchema = z.object({
 // POST /v1/brief/extract
 router.post("/brief/extract", validate(extractSchema), async (req, res) => {
   const { history } = req.body as z.infer<typeof extractSchema>;
-  const brief = await extractBrief(history);
+  const userApiKey = req.headers["x-api-key"] as string | undefined;
+  const brief = await extractBrief(history, userApiKey);
   res.json({ brief });
 });
 
 // POST /v1/brief/update
 router.post("/brief/update", validate(updateSchema), async (req, res) => {
   const { currentBrief, newMessages } = req.body as z.infer<typeof updateSchema>;
-  const brief = await updateBrief(currentBrief, newMessages);
+  const userApiKey = req.headers["x-api-key"] as string | undefined;
+  const brief = await updateBrief(currentBrief, newMessages, userApiKey);
   res.json({ brief });
 });
 

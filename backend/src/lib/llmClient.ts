@@ -24,14 +24,19 @@ export interface LlmResult {
 
 let _client: Anthropic | null = null;
 
-function getClient(): Anthropic | null {
-  const apiKey = process.env["ANTHROPIC_API_KEY"] ?? process.env["LLM_API_KEY"] ?? "";
-  if (!apiKey) {
+function getClient(apiKey?: string): Anthropic | null {
+  // Per-request key: fresh instance, no caching (prevents cross-request leakage)
+  if (apiKey) {
+    return new Anthropic({ apiKey, timeout: TIMEOUT_MS, maxRetries: MAX_RETRIES });
+  }
+  // Env key: reuse singleton
+  const envKey = process.env["ANTHROPIC_API_KEY"] ?? process.env["LLM_API_KEY"] ?? "";
+  if (!envKey) {
     logger.warn({ module: "llmClient" }, "ANTHROPIC_API_KEY not set — rewrite will fallback");
     return null;
   }
   if (!_client) {
-    _client = new Anthropic({ apiKey, timeout: TIMEOUT_MS, maxRetries: MAX_RETRIES });
+    _client = new Anthropic({ apiKey: envKey, timeout: TIMEOUT_MS, maxRetries: MAX_RETRIES });
   }
   return _client;
 }
@@ -40,8 +45,8 @@ function getClient(): Anthropic | null {
  * Call Claude and return the text response.
  * Returns null on any failure — caller MUST apply fallback.
  */
-export async function callLlm(params: LlmCallParams): Promise<LlmResult | null> {
-  const client = getClient();
+export async function callLlm(params: LlmCallParams, apiKey?: string): Promise<LlmResult | null> {
+  const client = getClient(apiKey);
   if (!client) return null;
 
   const start = Date.now();

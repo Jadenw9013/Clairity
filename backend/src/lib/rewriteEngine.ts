@@ -12,6 +12,7 @@ export interface LyraInput {
   history: Message[];
   site: Site;
   brief?: ConversationBrief;
+  apiKey?: string;
 }
 
 export interface LyraOutput {
@@ -25,7 +26,7 @@ export interface LyraOutput {
  * Never throws.
  */
 export async function callLyra(input: LyraInput): Promise<LyraOutput> {
-  const { prompt, history, site, brief } = input;
+  const { prompt, history, site, brief, apiKey } = input;
 
   const system = buildSystemPrompt(history, site, brief);
 
@@ -35,7 +36,7 @@ export async function callLyra(input: LyraInput): Promise<LyraOutput> {
     { role: "user", content: prompt },
   ];
 
-  const result = await callLlm({ system, messages });
+  const result = await callLlm({ system, messages }, apiKey);
 
   if (!result) {
     logger.info({ module: "rewriteEngine", historyLen: history.length, briefActive: !!brief }, "LLM unavailable — returning original prompt");

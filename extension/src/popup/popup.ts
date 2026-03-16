@@ -1,4 +1,5 @@
 import type { RewriteResponse, ErrorResponse } from "shared/types/index.ts";
+import { getApiKey, setApiKey, clearApiKey, maskApiKey } from "../lib/apiKeyStore.js";
 
 const promptEl = document.getElementById("prompt") as HTMLTextAreaElement;
 const buttonEl = document.getElementById("enhance") as HTMLButtonElement;
@@ -10,6 +11,68 @@ const siteEl = document.getElementById("site-select") as HTMLSelectElement;
 const chipEl = document.getElementById("history-chip") as HTMLDivElement;
 const btnTextEl = buttonEl.querySelector(".btn-text") as HTMLSpanElement;
 const btnSpinnerEl = buttonEl.querySelector(".btn-spinner") as HTMLSpanElement;
+
+// --- API Key UI elements ---
+const apikeyStateA = document.getElementById("apikey-state-a") as HTMLDivElement;
+const apikeyStateB = document.getElementById("apikey-state-b") as HTMLDivElement;
+const apikeyInput = document.getElementById("apikey-input") as HTMLInputElement;
+const apikeySaveBtn = document.getElementById("apikey-save") as HTMLButtonElement;
+const apikeyRemoveBtn = document.getElementById("apikey-remove") as HTMLButtonElement;
+const apikeyMasked = document.getElementById("apikey-masked") as HTMLSpanElement;
+const apikeyErrorEl = document.getElementById("apikey-error") as HTMLDivElement;
+
+// --- API Key state management ---
+function showKeyStateA(): void {
+  apikeyStateA.classList.remove("hidden");
+  apikeyStateB.classList.add("hidden");
+  buttonEl.disabled = true;
+  buttonEl.title = "Save your Anthropic API key first";
+  const spanText = buttonEl.querySelector(".btn-text") as HTMLSpanElement;
+  if (spanText) spanText.textContent = "Add API key to enhance";
+}
+
+function showKeyStateB(maskedKey: string): void {
+  apikeyStateA.classList.add("hidden");
+  apikeyStateB.classList.remove("hidden");
+  apikeyMasked.textContent = maskedKey;
+  buttonEl.disabled = false;
+  buttonEl.title = "";
+  const spanText = buttonEl.querySelector(".btn-text") as HTMLSpanElement;
+  if (spanText) spanText.textContent = "Fix my question";
+}
+
+async function initApiKeyUI(): Promise<void> {
+  const key = await getApiKey();
+  if (key) {
+    showKeyStateB(maskApiKey(key));
+  } else {
+    showKeyStateA();
+  }
+}
+
+apikeySaveBtn.addEventListener("click", async () => {
+  const raw = apikeyInput.value.trim();
+  apikeyErrorEl.classList.add("hidden");
+  try {
+    await setApiKey(raw);
+    apikeyInput.value = "";
+    showKeyStateB(maskApiKey(raw));
+  } catch {
+    apikeyErrorEl.classList.remove("hidden");
+  }
+});
+
+apikeyInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") void apikeySaveBtn.click();
+});
+
+apikeyRemoveBtn.addEventListener("click", async () => {
+  await clearApiKey();
+  showKeyStateA();
+});
+
+// Initialise on load
+void initApiKeyUI();
 
 // --- Display helpers ---
 function showResult(data: RewriteResponse): void {
@@ -121,3 +184,4 @@ promptEl.addEventListener("keydown", (e) => {
     void handleEnhance();
   }
 });
+
