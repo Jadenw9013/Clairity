@@ -1,7 +1,48 @@
 # Clairity
 
+> Enhance your prompts on ChatGPT, Claude, and Gemini using
+> conversation context and the Lyra optimization framework.
+
+## Install & Use (5 minutes)
+
+**Prerequisites:** Node.js >= 20, npm >= 10, Chrome
+
+**1. Clone and build**
+```bash
+git clone https://github.com/Jadenw9013/Clairity.git
+cd Clairity
+npm install
+npm run build --workspace=shared
+npm run build --workspace=extension
+```
+
+**2. Load in Chrome**
+1. Go to `chrome://extensions`
+2. Enable Developer Mode (top right toggle)
+3. Click **Load unpacked** → select `extension/dist/`
+
+**3. Add your API key**
+1. Open the Clairity popup in Chrome
+2. Enter your Anthropic API key (starts with `sk-ant-`)
+3. Click **Save** — the enhance button unlocks
+
+Get a free key at [console.anthropic.com](https://console.anthropic.com).
+Costs fractions of a cent per use.
+
+**To update after a `git pull`:**
+```bash
+npm run build --workspace=shared
+npm run build --workspace=extension
+```
+Then hit the **refresh icon** on the extension in `chrome://extensions`.
+
+No `.env` setup required. The backend runs on a hosted server. Just build, load, and add your key.
+
+---
+
 Production-grade Chrome extension that rewrites prompts into optimized
 structured prompts for better LLM outputs.
+
 
 ## Architecture
 
