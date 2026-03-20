@@ -138,9 +138,14 @@ export const geminiAdapter: SiteAdapter = {
   getButtonAnchor(): HTMLElement | null {
     const input = this.getPromptElement();
     if (!input) return null;
-    // Walk up to the rich-textarea web component or its parent container
+
+    // The rich-textarea web component sits inside a container div
+    // alongside a toolbar row with + Tools, Fast/model, and send buttons.
+    // Returning rich-textarea itself means "afterend" places our button
+    // as the next sibling — inside that same container row.
     const richTextarea = input.closest("rich-textarea") as HTMLElement;
-    if (richTextarea) return richTextarea.parentElement ?? richTextarea;
+    if (richTextarea) return richTextarea;
+
     return input.parentElement;
   },
 

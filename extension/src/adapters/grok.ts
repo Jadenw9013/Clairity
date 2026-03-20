@@ -99,13 +99,23 @@ export const grokAdapter: SiteAdapter = {
   getButtonAnchor(): HTMLElement | null {
     const input = this.getPromptElement();
     if (!input) return null;
-    // Walk up to the .query-bar container or its parent with the action buttons
+
+    // Find the .query-bar container
     const queryBar = input.closest(".query-bar") as HTMLElement;
-    if (queryBar) return queryBar;
-    // Fallback: the absolute-positioned bottom wrapper
-    const bottomBar = input.closest('div[class*="absolute"][class*="bottom"]') as HTMLElement;
-    if (bottomBar) return bottomBar;
-    return input.parentElement;
+    if (queryBar) {
+      // Look for the first action button (attach/mic) inside query-bar
+      // so "afterend" places our button right next to it in the same row
+      const firstBtn = queryBar.querySelector<HTMLElement>(
+        'button[aria-label*="attach" i], button[aria-label*="mic" i], button[aria-label*="voice" i], button'
+      );
+      if (firstBtn) return firstBtn;
+      // If no button found, return the input element itself
+      // so the button appears right after it inside query-bar
+      return input;
+    }
+
+    // Fallback: return the input so button is a sibling inside its parent
+    return input;
   },
 
   getConversationHistory(): Message[] {
