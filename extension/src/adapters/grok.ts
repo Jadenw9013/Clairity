@@ -100,20 +100,42 @@ export const grokAdapter: SiteAdapter = {
     const input = this.getPromptElement();
     if (!input) return null;
 
-    // From DevTools: the right-side button group inside the query-bar bottom row
-    // contains [Auto dropdown, mic, waveform]. Prepend Clairity as its first child.
+    // From DevTools the Grok input structure is:
+    //   div.query-bar (outer)
+    //     div.query-bar (inner contenteditable)
+    //     div.flex.absolute.inset-x-0.bottom-0 (bottom row)
+    //       grammarly-extension
+    //       div.grow.flex.items-center.gap-1.5 (RIGHT side buttons)
+    //
+    // Step 1: find the bottom row inside query-bar
     const queryBar = input.closest(".query-bar") as HTMLElement;
     if (queryBar) {
-      const rightButtons = queryBar.querySelector<HTMLElement>(
+      const bottomRow = queryBar.querySelector<HTMLElement>(
+        'div[class*="absolute"][class*="bottom"]'
+      );
+      if (bottomRow) {
+        // Step 2: find the right-side button group (has "grow" class)
+        const rightButtons = bottomRow.querySelector<HTMLElement>(
+          'div[class*="grow"][class*="flex"]'
+        );
+        if (rightButtons) {
+          rightButtons.setAttribute("data-clairity-inject", "prepend");
+          return rightButtons;
+        }
+      }
+
+      // Fallback: try querySelectorAll and pick the LAST flex group (rightmost)
+      const allFlex = queryBar.querySelectorAll<HTMLElement>(
         'div[class*="grow"][class*="flex"][class*="items-center"]'
       );
-      if (rightButtons) {
-        rightButtons.setAttribute("data-clairity-inject", "prepend");
-        return rightButtons;
+      if (allFlex.length > 0) {
+        const last = allFlex[allFlex.length - 1]!;
+        last.setAttribute("data-clairity-inject", "prepend");
+        return last;
       }
     }
 
-    // Fallback: use the input itself
+    // Last resort
     return input;
   },
 
