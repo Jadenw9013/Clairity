@@ -2,7 +2,7 @@
 // Shared TypeScript types used by both extension and backend.
 
 /** Supported AI chat sites */
-export type Site = "chatgpt" | "claude" | "gemini";
+export type Site = "chatgpt" | "claude" | "gemini" | "vscode";
 
 /** A single message in the conversation history */
 export interface Message {
