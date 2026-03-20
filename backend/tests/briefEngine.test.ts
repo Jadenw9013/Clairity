@@ -149,16 +149,16 @@ describe("updateBrief", () => {
 // ---------------------------------------------------------------------------
 describe("buildSystemPrompt", () => {
   it("includes goal and avoid list when brief is provided", () => {
-    const system = buildSystemPrompt(sampleHistory, "chatgpt", sampleBrief);
+    const system = buildSystemPrompt(sampleHistory, "chatgpt", sampleBrief, 10);
 
     expect(system).toContain(sampleBrief.goal);
     expect(system).toContain(sampleBrief.avoid[0]!);
-    expect(system).toContain("structured brief");
+    expect(system).toContain("CONVERSATION BRIEF");
     expect(system).toContain("ChatGPT");
   });
 
   it("does not include raw history block when brief is provided", () => {
-    const system = buildSystemPrompt(sampleHistory, "claude", sampleBrief);
+    const system = buildSystemPrompt(sampleHistory, "claude", sampleBrief, 10);
 
     // Brief mode: should NOT include the raw "Conversation so far:" block
     expect(system).not.toContain("Conversation so far:");
@@ -167,8 +167,8 @@ describe("buildSystemPrompt", () => {
   it("uses raw history block when no brief is provided", () => {
     const system = buildSystemPrompt(sampleHistory, "gemini");
 
-    expect(system).toContain("Conversation so far:");
-    expect(system).not.toContain("conversation brief");
+    expect(system).toContain("Recent conversation:");
+    expect(system).not.toContain("CONVERSATION BRIEF");
     expect(system).toContain("Gemini");
   });
 
@@ -179,10 +179,19 @@ describe("buildSystemPrompt", () => {
     expect(system).toContain("ChatGPT");
   });
 
-  it("includes recent exchanges block from history in brief mode", () => {
-    const system = buildSystemPrompt(sampleHistory, "claude", sampleBrief);
+  it("includes recent exchanges block from history in brief mode (messageCount < 20)", () => {
+    const system = buildSystemPrompt(sampleHistory, "claude", sampleBrief, 10);
 
     // Should include last messages for immediate continuity
-    expect(system).toContain("Recent exchanges:");
+    expect(system).toContain("Most recent exchange:");
+  });
+
+  it("excludes recent exchanges when messageCount >= 20 (brief-only mode)", () => {
+    const longBrief: ConversationBrief = { ...sampleBrief, messageCount: 22 };
+    const system = buildSystemPrompt(sampleHistory, "claude", longBrief, 22);
+
+    expect(system).toContain(longBrief.goal);
+    expect(system).not.toContain("Most recent exchange:");
+    expect(system).toContain("conversation is long");
   });
 });

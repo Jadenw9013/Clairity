@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { ConversationBrief } from "../../shared/types/index.js";
 
 // Hoist mocks before module import
 const mockCallLlm = vi.hoisted(() => vi.fn());
@@ -13,8 +14,68 @@ vi.mock("../src/lib/llmPrompts.js", () => ({
   LYRA_SYSTEM_PROMPT: "lyra",
 }));
 
-import { callLyra } from "../src/lib/rewriteEngine.js";
+import { callLyra, trimHistory } from "../src/lib/rewriteEngine.js";
 
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Generate N message pairs (user + assistant) */
+function generateHistory(pairs: number) {
+  const messages: Array<{ role: "user" | "assistant"; content: string }> = [];
+  for (let i = 0; i < pairs; i++) {
+    messages.push({ role: "user", content: `user message ${i + 1}` });
+    messages.push({ role: "assistant", content: `assistant message ${i + 1}` });
+  }
+  return messages;
+}
+
+const sampleBrief: ConversationBrief = {
+  goal: "Build a Chrome extension",
+  establishedContext: ["Uses MV3"],
+  userStyle: "Technical",
+  activeTopic: "Button injection",
+  avoid: ["Manifest setup"],
+  messageCount: 10,
+  lastUpdatedAt: Date.now(),
+};
+
+// ---------------------------------------------------------------------------
+// trimHistory tests
+// ---------------------------------------------------------------------------
+describe("trimHistory", () => {
+  it("returns full history when no brief and count < 20", () => {
+    const history = generateHistory(4); // 8 messages
+    const trimmed = trimHistory(history, undefined);
+    expect(trimmed).toHaveLength(8);
+  });
+
+  it("returns last 4 messages when brief active and count 6–19", () => {
+    const history = generateHistory(8); // 16 messages
+    const brief = { ...sampleBrief, messageCount: 16 };
+    const trimmed = trimHistory(history, brief);
+    expect(trimmed).toHaveLength(4);
+    expect(trimmed[0]!.content).toBe("user message 7"); // last 2 pairs
+  });
+
+  it("returns empty array when brief active and count >= 20", () => {
+    const history = generateHistory(12); // 24 messages
+    const brief = { ...sampleBrief, messageCount: 24 };
+    const trimmed = trimHistory(history, brief);
+    expect(trimmed).toHaveLength(0);
+  });
+
+  it("returns last 8 messages when no brief and count >= 20", () => {
+    const history = generateHistory(12); // 24 messages
+    const trimmed = trimHistory(history, undefined);
+    expect(trimmed).toHaveLength(8);
+    expect(trimmed[0]!.content).toBe("user message 9"); // last 4 pairs
+  });
+});
+
+// ---------------------------------------------------------------------------
+// callLyra tests
+// ---------------------------------------------------------------------------
 describe("callLyra", () => {
   beforeEach(() => {
     mockCallLlm.mockReset();
@@ -36,7 +97,7 @@ describe("callLyra", () => {
     expect(llmArgs.messages[0]).toMatchObject({ role: "user", content: "explain closures" });
   });
 
-  it("forwards non-empty history to the LLM call", async () => {
+  it("forwards non-empty history to the LLM call (no brief, small history)", async () => {
     mockCallLlm.mockResolvedValue({ content: "Context-aware prompt", model: "claude-3-haiku-20240307" });
 
     const history = [
@@ -92,4 +153,58 @@ describe("callLyra", () => {
     const apiKeyArg = mockCallLlm.mock.calls[0]![1] as string | undefined;
     expect(apiKeyArg).toBeUndefined();
   });
+
+  // -----------------------------------------------------------------------
+  // 20+ message scenarios (the fix)
+  // -----------------------------------------------------------------------
+
+  it("sends only current prompt (no history messages) when brief active and 20+ messages", async () => {
+    mockCallLlm.mockResolvedValue({ content: "Brief-only optimized", model: "claude-haiku-4-5-20251001" });
+
+    const history = generateHistory(22); // 44 messages
+    const brief = { ...sampleBrief, messageCount: 44 };
+
+    const result = await callLyra({ prompt: "next question", history, site: "chatgpt", brief });
+
+    expect(result.enhanced_prompt).toBe("Brief-only optimized");
+    expect(result.model).toBe("claude-haiku-4-5-20251001");
+
+    // Only the current prompt should be in messages — no history
+    const llmArgs = mockCallLlm.mock.calls[0]![0] as { messages: unknown[] };
+    expect(llmArgs.messages).toHaveLength(1);
+    expect(llmArgs.messages[0]).toMatchObject({ role: "user", content: "next question" });
+  });
+
+  it("sends last 8 messages + current prompt when no brief and 20+ messages", async () => {
+    mockCallLlm.mockResolvedValue({ content: "Fallback optimized", model: "claude-haiku-4-5-20251001" });
+
+    const history = generateHistory(22); // 44 messages
+    // No brief — simulates failed extraction
+
+    const result = await callLyra({ prompt: "follow up", history, site: "claude" });
+
+    expect(result.enhanced_prompt).toBe("Fallback optimized");
+
+    const llmArgs = mockCallLlm.mock.calls[0]![0] as { messages: unknown[] };
+    // 8 trimmed history + 1 current prompt = 9
+    expect(llmArgs.messages).toHaveLength(9);
+    expect(llmArgs.messages[8]).toMatchObject({ role: "user", content: "follow up" });
+  });
+
+  it("sends last 4 messages + current prompt when brief active and 6–19 messages", async () => {
+    mockCallLlm.mockResolvedValue({ content: "State 2 optimized", model: "claude-haiku-4-5-20251001" });
+
+    const history = generateHistory(8); // 16 messages
+    const brief = { ...sampleBrief, messageCount: 16 };
+
+    const result = await callLyra({ prompt: "another question", history, site: "gemini", brief });
+
+    expect(result.enhanced_prompt).toBe("State 2 optimized");
+
+    const llmArgs = mockCallLlm.mock.calls[0]![0] as { messages: unknown[] };
+    // 4 trimmed history + 1 current prompt = 5
+    expect(llmArgs.messages).toHaveLength(5);
+    expect(llmArgs.messages[4]).toMatchObject({ role: "user", content: "another question" });
+  });
 });
+

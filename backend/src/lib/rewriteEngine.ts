@@ -21,6 +21,39 @@ export interface LyraOutput {
 }
 
 /**
+ * Trim history based on message count tier and brief presence.
+ *
+ * - messageCount < 6 (no brief):          pass full history (small, STATE 1)
+ * - messageCount 6–19 (brief active):     last 2 pairs (4 messages)
+ * - messageCount >= 20 (brief active):    no history, brief is sufficient
+ * - messageCount >= 20 (brief null):      last 4 pairs (8 messages), never full
+ */
+export function trimHistory(
+  history: Message[],
+  brief: ConversationBrief | undefined
+): Message[] {
+  const messageCount = brief?.messageCount ?? history.length;
+
+  if (brief) {
+    // Brief is active — trim aggressively
+    if (messageCount >= 20) {
+      return []; // brief-only, no raw history
+    }
+    // 6–19: last 2 pairs
+    return history.slice(-4);
+  }
+
+  // No brief
+  if (messageCount >= 20) {
+    // Brief extraction failed — use last 4 pairs as safety net
+    return history.slice(-8);
+  }
+
+  // STATE 1: small conversation, full history is fine
+  return history;
+}
+
+/**
  * Run the Lyra prompt optimization pipeline.
  * On any LLM failure returns the original prompt unchanged with model="fallback".
  * Never throws.
@@ -28,18 +61,21 @@ export interface LyraOutput {
 export async function callLyra(input: LyraInput): Promise<LyraOutput> {
   const { prompt, history, site, brief, apiKey } = input;
 
-  const system = buildSystemPrompt(history, site, brief);
+  const trimmed = trimHistory(history, brief);
+  const messageCount = brief?.messageCount ?? history.length;
 
-  // Compose message list: history context + the user's current prompt
+  const system = buildSystemPrompt(trimmed, site, brief, messageCount);
+
+  // Compose message list: trimmed history context + the user's current prompt
   const messages: Message[] = [
-    ...history,
+    ...trimmed,
     { role: "user", content: prompt },
   ];
 
   const result = await callLlm({ system, messages }, apiKey);
 
   if (!result) {
-    logger.info({ module: "rewriteEngine", historyLen: history.length, briefActive: !!brief }, "LLM unavailable — returning original prompt");
+    logger.info({ module: "rewriteEngine", historyLen: history.length, trimmedLen: trimmed.length, briefActive: !!brief }, "LLM unavailable — returning original prompt");
     return { enhanced_prompt: prompt, model: "fallback" };
   }
 
