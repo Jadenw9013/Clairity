@@ -1,16 +1,10 @@
 import type { SiteAdapter, Message } from "shared/types/index.ts";
 
 const PROMPT_SELECTORS = [
-  'textarea[placeholder*="Ask"]',
   'div[contenteditable="true"][data-slate-editor="true"]',
-  "textarea#ask-input",
-  "textarea",
-];
-
-const ANCHOR_SELECTORS = [
+  'div[contenteditable="true"][data-slate-node="value"]',
   'textarea[placeholder*="Ask"]',
-  'div[contenteditable="true"][data-slate-editor="true"]',
-  "textarea#ask-input",
+  'textarea[placeholder*="Type"]',
   "textarea",
 ];
 
@@ -26,16 +20,25 @@ function query(selectors: string[]): HTMLElement | null {
   return null;
 }
 
-function insertIntoContentEditable(el: HTMLElement, text: string): void {
+/**
+ * Insert text into Perplexity's Slate.js editor.
+ * Slate requires execCommand-based insertion with proper InputEvent
+ * to update its internal state tree.
+ */
+function insertIntoSlateEditor(el: HTMLElement, text: string): void {
   el.focus();
   const selection = window.getSelection();
-  if (selection) { selection.selectAllChildren(el); selection.deleteFromDocument(); }
-  if (typeof document.execCommand === "function") {
-    const inserted = document.execCommand("insertText", false, text);
-    if (inserted) return;
+  if (selection) {
+    selection.selectAllChildren(el);
   }
-  el.textContent = text;
-  el.dispatchEvent(new InputEvent("input", { bubbles: true }));
+  document.execCommand("insertText", false, text);
+  el.dispatchEvent(
+    new InputEvent("input", {
+      bubbles: true,
+      inputType: "insertText",
+      data: text,
+    })
+  );
 }
 
 function getConversationHistoryFromDOM(): Message[] {
@@ -98,12 +101,18 @@ export const perplexityAdapter: SiteAdapter = {
       el.dispatchEvent(new Event("input", { bubbles: true }));
       return;
     }
-    insertIntoContentEditable(el, text);
+    // Slate.js editor — specialized injection
+    insertIntoSlateEditor(el, text);
   },
 
   getButtonAnchor(): HTMLElement | null {
-    const input = query(ANCHOR_SELECTORS);
-    return input?.parentElement ?? null;
+    const input = this.getPromptElement();
+    if (!input) return null;
+    // Walk up to the grow wrapper that contains the input area
+    const growWrapper = input.closest('div[class*="grow"]') as HTMLElement;
+    if (growWrapper) return growWrapper;
+    // Fallback: go up two levels past the Slate wrapper divs
+    return input.parentElement?.parentElement ?? input.parentElement;
   },
 
   getConversationHistory(): Message[] {

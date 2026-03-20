@@ -1,15 +1,11 @@
 import type { SiteAdapter, Message } from "shared/types/index.ts";
 
 const PROMPT_SELECTORS = [
+  '.query-bar div[contenteditable="true"]',
   'div[contenteditable="true"][aria-label*="Ask"]',
   'textarea[aria-label*="Ask Grok"]',
+  '.query-bar textarea',
   'div[data-testid="tweetTextarea_0"]',
-  'div[contenteditable="true"]',
-];
-
-const ANCHOR_SELECTORS = [
-  'div[contenteditable="true"][aria-label*="Ask"]',
-  'textarea[aria-label*="Ask Grok"]',
   'div[contenteditable="true"]',
 ];
 
@@ -101,8 +97,15 @@ export const grokAdapter: SiteAdapter = {
   },
 
   getButtonAnchor(): HTMLElement | null {
-    const input = query(ANCHOR_SELECTORS);
-    return input?.parentElement ?? null;
+    const input = this.getPromptElement();
+    if (!input) return null;
+    // Walk up to the .query-bar container or its parent with the action buttons
+    const queryBar = input.closest(".query-bar") as HTMLElement;
+    if (queryBar) return queryBar;
+    // Fallback: the absolute-positioned bottom wrapper
+    const bottomBar = input.closest('div[class*="absolute"][class*="bottom"]') as HTMLElement;
+    if (bottomBar) return bottomBar;
+    return input.parentElement;
   },
 
   getConversationHistory(): Message[] {

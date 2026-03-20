@@ -1,17 +1,12 @@
 import type { SiteAdapter, Message } from "shared/types/index.ts";
 
 const PROMPT_SELECTORS = [
-  'div[contenteditable="true"]#searchbox',
-  'textarea[name="q"]',
-  'div[contenteditable="true"][aria-label*="Ask"]',
-  'cib-text-input div[contenteditable="true"]',
-  "textarea",
-];
-
-const ANCHOR_SELECTORS = [
+  'span[role="textbox"][contenteditable="true"]',
+  "#m365-chat-editor-target-element",
+  '[data-lexical-editor="true"]',
+  '[aria-label="Message Copilot"]',
   'div[contenteditable="true"]#searchbox',
   'div[contenteditable="true"][aria-label*="Ask"]',
-  'cib-text-input div[contenteditable="true"]',
   "textarea",
 ];
 
@@ -27,16 +22,16 @@ function query(selectors: string[]): HTMLElement | null {
   return null;
 }
 
-function insertIntoContentEditable(el: HTMLElement, text: string): void {
+/**
+ * Insert text into Copilot's Lexical editor.
+ * Standard textContent mutation doesn't work with Lexical — must use
+ * execCommand selectAll + insertText to update the editor state.
+ */
+function insertIntoCopilotEditor(el: HTMLElement, text: string): void {
   el.focus();
-  const selection = window.getSelection();
-  if (selection) { selection.selectAllChildren(el); selection.deleteFromDocument(); }
-  if (typeof document.execCommand === "function") {
-    const inserted = document.execCommand("insertText", false, text);
-    if (inserted) return;
-  }
-  el.textContent = text;
-  el.dispatchEvent(new InputEvent("input", { bubbles: true }));
+  document.execCommand("selectAll", false);
+  document.execCommand("insertText", false, text);
+  el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText" }));
 }
 
 function getConversationHistoryFromDOM(): Message[] {
@@ -99,12 +94,22 @@ export const copilotAdapter: SiteAdapter = {
       el.dispatchEvent(new Event("input", { bubbles: true }));
       return;
     }
-    insertIntoContentEditable(el, text);
+    // Copilot uses a Lexical editor — special insertion required
+    insertIntoCopilotEditor(el, text);
   },
 
   getButtonAnchor(): HTMLElement | null {
-    const input = query(ANCHOR_SELECTORS);
+    const input = this.getPromptElement();
     if (!input) return null;
+    // Try stable container patterns (avoid obfuscated fai-* classes)
+    const chatInput = input.closest('[class*="ChatInput"]') as HTMLElement;
+    if (chatInput) return chatInput;
+    const faiInput = input.closest('[class*="fai-ChatInput"]') as HTMLElement;
+    if (faiInput) return faiInput;
+    // Fallback: walk up to an id containing "chat-input"
+    const idContainer = input.closest('[id*="chat-input"]') as HTMLElement;
+    if (idContainer) return idContainer;
+    // Last resort: cib-text-input or parent
     return (input.closest("cib-text-input") as HTMLElement) ?? input.parentElement;
   },
 

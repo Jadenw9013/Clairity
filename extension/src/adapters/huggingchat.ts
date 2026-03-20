@@ -1,14 +1,10 @@
 import type { SiteAdapter, Message } from "shared/types/index.ts";
 
 const PROMPT_SELECTORS = [
-  'div[contenteditable="true"]#chat-input',
+  'textarea[placeholder="Ask anything"]',
+  'textarea[rows="1"]',
   'textarea[name="text"]',
-  'div[contenteditable="true"]',
-];
-
-const ANCHOR_SELECTORS = [
   'div[contenteditable="true"]#chat-input',
-  'textarea[name="text"]',
   'div[contenteditable="true"]',
 ];
 
@@ -22,18 +18,6 @@ function query(selectors: string[]): HTMLElement | null {
     } catch { /* skip */ }
   }
   return null;
-}
-
-function insertIntoContentEditable(el: HTMLElement, text: string): void {
-  el.focus();
-  const selection = window.getSelection();
-  if (selection) { selection.selectAllChildren(el); selection.deleteFromDocument(); }
-  if (typeof document.execCommand === "function") {
-    const inserted = document.execCommand("insertText", false, text);
-    if (inserted) return;
-  }
-  el.textContent = text;
-  el.dispatchEvent(new InputEvent("input", { bubbles: true }));
 }
 
 function getConversationHistoryFromDOM(): Message[] {
@@ -96,12 +80,26 @@ export const huggingChatAdapter: SiteAdapter = {
       el.dispatchEvent(new Event("input", { bubbles: true }));
       return;
     }
-    insertIntoContentEditable(el, text);
+    el.textContent = text;
+    el.dispatchEvent(new InputEvent("input", { bubbles: true }));
   },
 
   getButtonAnchor(): HTMLElement | null {
-    const input = query(ANCHOR_SELECTORS);
-    return input?.parentElement ?? null;
+    // Target the toolbar div with scrollbar-custom and flex-wrap classes
+    const toolbar = document.querySelector<HTMLElement>(
+      'div[class*="scrollbar-custom"][class*="flex-wrap"]'
+    );
+    if (toolbar) return toolbar;
+
+    // Fallback: find the textarea and go up to the form's toolbar area
+    const input = this.getPromptElement();
+    if (!input) return null;
+    const form = input.closest("form");
+    if (form) {
+      const toolbarInForm = form.querySelector<HTMLElement>('div[class*="flex-wrap"]');
+      if (toolbarInForm) return toolbarInForm;
+    }
+    return input.parentElement;
   },
 
   getConversationHistory(): Message[] {

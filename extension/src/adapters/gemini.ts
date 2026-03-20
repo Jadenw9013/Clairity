@@ -2,18 +2,10 @@ import type { SiteAdapter, Message } from "shared/types/index.ts";
 
 /** Selector fallback chain for Gemini prompt input */
 const PROMPT_SELECTORS = [
-  "rich-textarea p",
+  'rich-textarea p[contenteditable="true"]',
+  "rich-textarea .ql-editor",
   'rich-textarea div[contenteditable="true"]',
-  'div.ql-editor[contenteditable="true"]',
   'div[contenteditable="true"][aria-label*="Enter a prompt"]',
-  "textarea",
-];
-
-/** Selector fallback chain for button anchor */
-const ANCHOR_SELECTORS = [
-  "rich-textarea p",
-  'rich-textarea div[contenteditable="true"]',
-  'div.ql-editor[contenteditable="true"]',
   "textarea",
 ];
 
@@ -32,36 +24,30 @@ function query(selectors: string[]): HTMLElement | null {
   return null;
 }
 
-function insertIntoContentEditable(el: HTMLElement, text: string): void {
+/**
+ * Insert text into Gemini's rich-textarea p element.
+ * Standard contentEditable mutation doesn't reliably sync with
+ * Gemini's editor state — dispatch both Event and InputEvent.
+ */
+function insertIntoGeminiEditor(el: HTMLElement, text: string): void {
   el.focus();
-
-  const selection = window.getSelection();
-  if (selection) {
-    selection.selectAllChildren(el);
-    selection.deleteFromDocument();
-  }
-
-  if (typeof document.execCommand === "function") {
-    const inserted = document.execCommand("insertText", false, text);
-    if (inserted) return;
-  }
-
   el.textContent = text;
-  el.dispatchEvent(new InputEvent("input", { bubbles: true }));
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+  el.dispatchEvent(
+    new InputEvent("input", {
+      bubbles: true,
+      inputType: "insertText",
+    })
+  );
 }
 
 /**
  * Extract conversation history from the Gemini DOM.
- *
- * Primary: user-query-text-line / user-query-text for user,
- *   message-content p / response-content for assistant.
- * Fallback: message-content, .conversation-turn in DOM order.
  */
 function getConversationHistoryFromDOM(): Message[] {
   type RawMsg = { el: HTMLElement; role: "user" | "assistant" };
   const raw: RawMsg[] = [];
 
-  // Strategy 1: role-specific selectors
   const userEls = Array.from(
     document.querySelectorAll<HTMLElement>(
       "div.user-query-text-line, div.user-query-text, .query-text, [data-role='user']"
@@ -77,7 +63,6 @@ function getConversationHistoryFromDOM(): Message[] {
     userEls.forEach((el) => raw.push({ el, role: "user" }));
     assistantEls.forEach((el) => raw.push({ el, role: "assistant" }));
 
-    // Sort by DOM position
     raw.sort((a, b) => {
       const pos = a.el.compareDocumentPosition(b.el);
       return pos & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
@@ -89,7 +74,7 @@ function getConversationHistoryFromDOM(): Message[] {
       .slice(-MAX_HISTORY);
   }
 
-  // Fallback: generic turn containers, alternate user/assistant by position
+  // Fallback: generic turn containers
   const fallbackEls = Array.from(
     document.querySelectorAll<HTMLElement>(
       "message-content, .conversation-turn, .chat-turn"
@@ -146,13 +131,17 @@ export const geminiAdapter: SiteAdapter = {
       return;
     }
 
-    insertIntoContentEditable(el, text);
+    // Gemini rich-textarea p element — use specialized injection
+    insertIntoGeminiEditor(el, text);
   },
 
   getButtonAnchor(): HTMLElement | null {
-    const input = query(ANCHOR_SELECTORS);
+    const input = this.getPromptElement();
     if (!input) return null;
-    return input.closest("rich-textarea") as HTMLElement ?? input.parentElement;
+    // Walk up to the rich-textarea web component or its parent container
+    const richTextarea = input.closest("rich-textarea") as HTMLElement;
+    if (richTextarea) return richTextarea.parentElement ?? richTextarea;
+    return input.parentElement;
   },
 
   getConversationHistory(): Message[] {
