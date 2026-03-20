@@ -1,6 +1,13 @@
 import { startAdapterSystem } from "../adapters/registry.js";
 import { injectEnhanceButton } from "./enhance-button.js";
 
+// Keep message port alive — prevents "Extension context invalidated" after rebuilds
+try {
+  if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
+    chrome.runtime.onMessage.addListener(() => { /* keep-alive */ });
+  }
+} catch { /* ignore if context already invalidated */ }
+
 /**
  * Simple debounce to limit execution frequency during rapid DOM changes.
  */

@@ -278,10 +278,21 @@ export function injectEnhanceButton(
 
 
     try {
+      if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) {
+        showErrorCard("Extension context lost — please reload the page.");
+        return;
+      }
+
       const response = await chrome.runtime.sendMessage({
         type: "REWRITE_PROMPT",
         payload: { prompt, site: adapter.id as Site, history, conversationId },
       });
+
+      if (chrome.runtime.lastError) {
+        console.warn("[Clairity]", chrome.runtime.lastError.message);
+        showErrorCard("Extension error — try reloading the page.");
+        return;
+      }
 
       if (!response) {
         showErrorCard("No response from service worker — try reloading the extension.");

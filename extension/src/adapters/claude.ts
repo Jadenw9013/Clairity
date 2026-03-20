@@ -151,8 +151,37 @@ export const claudeAdapter: SiteAdapter = {
   },
 
   getButtonAnchor(): HTMLElement | null {
+    // Strategy 1: find the + button in the bottom toolbar row.
+    // Return it directly — the default "afterend" injection places Clairity
+    // immediately to its RIGHT, between + and the Sonnet model selector.
+    const plusBtn = document.querySelector<HTMLElement>(
+      'fieldset button:first-of-type, ' +
+      'button[aria-label*="attach" i], ' +
+      'button[aria-label*="Add content" i], ' +
+      'button[data-testid*="attach"], ' +
+      'form button:first-child'
+    );
+    if (plusBtn) return plusBtn;
+
+    // Strategy 2: find the Sonnet / model selector and inject as first child of its row
+    const modelBtn = document.querySelector<HTMLElement>(
+      'button[aria-label*="sonnet" i], ' +
+      'button[aria-label*="model" i], ' +
+      '[data-testid*="model-switcher"], ' +
+      'div[class*="model"] button'
+    );
+    if (modelBtn) {
+      const row = modelBtn.closest<HTMLElement>('div[class*="flex"]');
+      if (row) {
+        row.setAttribute("data-clairity-inject", "prepend");
+        return row;
+      }
+    }
+
+    // Fallback: fieldset or input parent
     const input = query(ANCHOR_SELECTORS);
-    return input?.parentElement ?? null;
+    const fieldset = input?.closest("fieldset") as HTMLElement | null;
+    return fieldset ?? input?.parentElement ?? null;
   },
 
   getConversationHistory(): Message[] {

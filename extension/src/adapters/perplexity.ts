@@ -1,11 +1,11 @@
 import type { SiteAdapter, Message } from "shared/types/index.ts";
 
 const PROMPT_SELECTORS = [
+  'textarea[placeholder*="connectors"]',
+  'textarea[placeholder*="Type @"]',
   'div[contenteditable="true"][data-slate-editor="true"]',
   'div[contenteditable="true"][data-slate-node="value"]',
-  'textarea[placeholder*="Ask"]',
-  'textarea[placeholder*="Type"]',
-  "textarea",
+  'div[contenteditable="true"]',
 ];
 
 const MAX_HISTORY = 20;
@@ -27,10 +27,11 @@ function query(selectors: string[]): HTMLElement | null {
  */
 function insertIntoSlateEditor(el: HTMLElement, text: string): void {
   el.focus();
-  const selection = window.getSelection();
-  if (selection) {
-    selection.selectAllChildren(el);
-  }
+  const sel = window.getSelection();
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  sel?.removeAllRanges();
+  sel?.addRange(range);
   document.execCommand("insertText", false, text);
   el.dispatchEvent(
     new InputEvent("input", {
@@ -108,16 +109,32 @@ export const perplexityAdapter: SiteAdapter = {
   getButtonAnchor(): HTMLElement | null {
     const input = this.getPromptElement();
     if (!input) return null;
-    // Walk up to the grow wrapper that contains the input area
-    const growWrapper = input.closest('div[class*="grow"]') as HTMLElement;
-    if (growWrapper) return growWrapper;
+
+    // Find the container holding both the input and the bottom toolbar
+    const container = input.closest<HTMLElement>(
+      'form, div[class*="relative"]'
+    );
+    if (container) {
+      // Look for the toolbar row containing buttons (+ , Model, mic, etc.)
+      const toolbar = container.querySelector<HTMLElement>(
+        'div[class*="flex"][class*="items-center"]:has(button)'
+      );
+      if (toolbar && toolbar !== container) {
+        // Return the first child (the + button) so afterend injection
+        // places Clairity right after it, between + and Model dropdown
+        const firstChild = toolbar.children[0] as HTMLElement | undefined;
+        if (firstChild) return firstChild;
+        return toolbar;
+      }
+    }
+
     // Fallback: go up two levels past the Slate wrapper divs
-    return input.parentElement?.parentElement ?? input.parentElement;
+    return (input.parentElement?.parentElement as HTMLElement) ?? input.parentElement;
   },
 
   getConversationHistory(): Message[] {
     return getConversationHistoryFromDOM();
   },
 
-  destroy(): void {},
+  destroy(): void { },
 };

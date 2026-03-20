@@ -25,6 +25,7 @@
     "https://grok.com/*",
     "https://x.com/i/grok*",
     "https://copilot.microsoft.com/*",
+    "https://m365.cloud.microsoft/*",
     "https://www.bing.com/chat*",
     "https://poe.com/*",
     "https://huggingface.co/chat*"
@@ -54,6 +55,7 @@
         "https://grok.com/*",
         "https://x.com/i/grok*",
         "https://copilot.microsoft.com/*",
+        "https://m365.cloud.microsoft/*",
         "https://www.bing.com/chat*",
         "https://poe.com/*",
         "https://huggingface.co/chat*"

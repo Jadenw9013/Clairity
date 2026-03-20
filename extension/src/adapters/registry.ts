@@ -8,7 +8,7 @@ import { copilotAdapter } from "./copilot.js";
 import { poeAdapter } from "./poe.js";
 import { huggingChatAdapter } from "./huggingchat.js";
 
-const OBSERVER_TIMEOUT_MS = 30_000;
+const OBSERVER_TIMEOUT_MS = 60_000;
 
 const adapters: SiteAdapter[] = [
   chatgptAdapter,

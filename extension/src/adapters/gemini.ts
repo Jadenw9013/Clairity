@@ -139,16 +139,17 @@ export const geminiAdapter: SiteAdapter = {
     const input = this.getPromptElement();
     if (!input) return null;
 
-    // From DevTools: the trailing-actions-wrapper is a SIBLING of rich-textarea
-    // (not a child) containing the Fast dropdown and mic button.
-    // Prepend Clairity as its first child so it appears left of Fast/mic.
+    // Primary: find the trailing-actions div which is a SIBLING of rich-textarea
+    // (not a child), containing the Fast dropdown and mic button.
     const richTextarea = input.closest("rich-textarea") as HTMLElement;
-    const inputContainer = richTextarea?.parentElement;
-    if (inputContainer) {
+    const parent = richTextarea?.parentElement;
+    if (parent) {
       const trailingActions =
-        inputContainer.querySelector<HTMLElement>('[class*="trailing-actions"]') ??
-        inputContainer.querySelector<HTMLElement>('[class*="trailing"]');
-      if (trailingActions) {
+        parent.querySelector<HTMLElement>('[class*="trailing-actions"]') ??
+        parent.querySelector<HTMLElement>('[class*="trailing"]') ??
+        parent.querySelector<HTMLElement>('div:has(button[aria-label*="Fast" i])') ??
+        parent.querySelector<HTMLElement>('div:has(button[aria-label*="model" i])');
+      if (trailingActions && trailingActions !== parent) {
         trailingActions.setAttribute("data-clairity-inject", "prepend");
         return trailingActions;
       }

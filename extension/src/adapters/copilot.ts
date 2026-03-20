@@ -1,13 +1,17 @@
 import type { SiteAdapter, Message } from "shared/types/index.ts";
 
 const PROMPT_SELECTORS = [
-  'span[role="textbox"][contenteditable="true"]',
-  "#m365-chat-editor-target-element",
   '[data-lexical-editor="true"]',
+  'div[contenteditable="true"][role="textbox"]',
+  'span[contenteditable="true"][role="textbox"]',
   '[aria-label="Message Copilot"]',
-  'div[contenteditable="true"]#searchbox',
-  'div[contenteditable="true"][aria-label*="Ask"]',
-  "textarea",
+  '[placeholder*="Message" i]',
+  '#userInput',
+  '#m365-chat-editor-target-element',
+  'div[contenteditable="true"][spellcheck="true"]',
+  'p[class*="editor"][contenteditable]',
+  'div[contenteditable="true"]',
+  'textarea',
 ];
 
 const MAX_HISTORY = 20;
@@ -31,7 +35,15 @@ function insertIntoCopilotEditor(el: HTMLElement, text: string): void {
   el.focus();
   document.execCommand("selectAll", false);
   document.execCommand("insertText", false, text);
-  el.dispatchEvent(new InputEvent("input", { bubbles: true, inputType: "insertText" }));
+  el.dispatchEvent(
+    new InputEvent("input", {
+      bubbles: true,
+      cancelable: true,
+      inputType: "insertText",
+      data: text,
+    })
+  );
+  el.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
 function getConversationHistoryFromDOM(): Message[] {
@@ -68,14 +80,20 @@ function getConversationHistoryFromDOM(): Message[] {
 export const copilotAdapter: SiteAdapter = {
   id: "copilot",
   name: "Microsoft Copilot",
-  urlPattern: /^https:\/\/copilot\.microsoft\.com|^https:\/\/www\.bing\.com\/chat/,
+  urlPattern: /^https:\/\/(copilot\.microsoft\.com|www\.copilot\.microsoft\.com|bing\.com\/chat|www\.bing\.com\/chat|m365\.cloud\.microsoft|outlook\.cloud\.microsoft)/,
 
   detect(): boolean {
-    return this.urlPattern.test(window.location.origin + window.location.pathname);
+    const href = window.location.origin + window.location.pathname;
+    const match = this.urlPattern.test(href);
+    console.log('[Clairity Copilot] detect() called', href, 'match:', match);
+    return match;
   },
 
   getPromptElement(): HTMLElement | null {
-    return query(PROMPT_SELECTORS);
+    console.log('[Clairity Copilot] getPromptElement() called');
+    const el = query(PROMPT_SELECTORS);
+    console.log('[Clairity Copilot] found:', el?.tagName, el?.getAttribute('role'), el?.getAttribute('aria-label'));
+    return el;
   },
 
   getPromptText(): string {
@@ -101,16 +119,35 @@ export const copilotAdapter: SiteAdapter = {
   getButtonAnchor(): HTMLElement | null {
     const input = this.getPromptElement();
     if (!input) return null;
-    // Try stable container patterns (avoid obfuscated fai-* classes)
-    const chatInput = input.closest('[class*="ChatInput"]') as HTMLElement;
-    if (chatInput) return chatInput;
-    const faiInput = input.closest('[class*="fai-ChatInput"]') as HTMLElement;
-    if (faiInput) return faiInput;
-    // Fallback: walk up to an id containing "chat-input"
-    const idContainer = input.closest('[id*="chat-input"]') as HTMLElement;
-    if (idContainer) return idContainer;
-    // Last resort: cib-text-input or parent
-    return (input.closest("cib-text-input") as HTMLElement) ?? input.parentElement;
+
+    // Strategy 1: find the Smart dropdown — most reliable anchor on both
+    // copilot.microsoft.com and m365.cloud.microsoft.
+    // Insert Clairity as first child of its row (before Smart).
+    const smartBtn =
+      document.querySelector<HTMLElement>('button[aria-label*="Smart" i]') ??
+      document.querySelector<HTMLElement>('button[aria-label*="model" i]') ??
+      document.querySelector<HTMLElement>('[class*="model-selector"]');
+    if (smartBtn) {
+      const row = smartBtn.closest<HTMLElement>(
+        'div[class*="flex"], div[class*="row"]'
+      ) ?? smartBtn.parentElement;
+      if (row) {
+        row.setAttribute("data-clairity-inject", "prepend");
+        return row;
+      }
+    }
+
+    // Strategy 2: find the + button and return it for afterend injection
+    const plusBtn =
+      document.querySelector<HTMLElement>('button[aria-label*="new" i]') ??
+      document.querySelector<HTMLElement>('button[aria-label*="attach" i]') ??
+      document.querySelector<HTMLElement>('button[aria-label*="add" i]') ??
+      document.querySelector<HTMLElement>('[class*="toolbar"] button:first-child') ??
+      document.querySelector<HTMLElement>('[class*="actions"] button:first-child');
+    if (plusBtn) return plusBtn;
+
+    // Last resort
+    return input.parentElement;
   },
 
   getConversationHistory(): Message[] {
