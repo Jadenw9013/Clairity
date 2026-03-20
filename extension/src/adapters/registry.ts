@@ -2,10 +2,24 @@ import type { SiteAdapter } from "shared/types/index.ts";
 import { chatgptAdapter } from "./chatgpt.js";
 import { claudeAdapter } from "./claude.js";
 import { geminiAdapter } from "./gemini.js";
+import { perplexityAdapter } from "./perplexity.js";
+import { grokAdapter } from "./grok.js";
+import { copilotAdapter } from "./copilot.js";
+import { poeAdapter } from "./poe.js";
+import { huggingChatAdapter } from "./huggingchat.js";
 
 const OBSERVER_TIMEOUT_MS = 30_000;
 
-const adapters: SiteAdapter[] = [chatgptAdapter, claudeAdapter, geminiAdapter];
+const adapters: SiteAdapter[] = [
+  chatgptAdapter,
+  claudeAdapter,
+  geminiAdapter,
+  perplexityAdapter,
+  grokAdapter,
+  copilotAdapter,
+  poeAdapter,
+  huggingChatAdapter,
+];
 
 
 /** Detect which adapter matches the current page */

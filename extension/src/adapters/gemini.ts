@@ -2,19 +2,10 @@ import type { SiteAdapter, Message } from "shared/types/index.ts";
 
 /** Selector fallback chain for Gemini prompt input */
 const PROMPT_SELECTORS = [
-  'div[contenteditable="true"].ql-editor',
+  'rich-textarea p[contenteditable="true"]',
+  "rich-textarea .ql-editor",
   'rich-textarea div[contenteditable="true"]',
-  'div[contenteditable="true"][aria-label*="message" i]',
-  'div[contenteditable="true"][aria-label*="prompt" i]',
-  'div[contenteditable="true"]',
-  "textarea",
-];
-
-/** Selector fallback chain for button anchor */
-const ANCHOR_SELECTORS = [
-  'div[contenteditable="true"].ql-editor',
-  'rich-textarea div[contenteditable="true"]',
-  'div[contenteditable="true"]',
+  'div[contenteditable="true"][aria-label*="Enter a prompt"]',
   "textarea",
 ];
 
@@ -33,45 +24,38 @@ function query(selectors: string[]): HTMLElement | null {
   return null;
 }
 
-function insertIntoContentEditable(el: HTMLElement, text: string): void {
+/**
+ * Insert text into Gemini's rich-textarea p element.
+ * Standard contentEditable mutation doesn't reliably sync with
+ * Gemini's editor state — dispatch both Event and InputEvent.
+ */
+function insertIntoGeminiEditor(el: HTMLElement, text: string): void {
   el.focus();
-
-  const selection = window.getSelection();
-  if (selection) {
-    selection.selectAllChildren(el);
-    selection.deleteFromDocument();
-  }
-
-  if (typeof document.execCommand === "function") {
-    const inserted = document.execCommand("insertText", false, text);
-    if (inserted) return;
-  }
-
   el.textContent = text;
-  el.dispatchEvent(new InputEvent("input", { bubbles: true }));
+  el.dispatchEvent(new Event("input", { bubbles: true }));
+  el.dispatchEvent(
+    new InputEvent("input", {
+      bubbles: true,
+      inputType: "insertText",
+    })
+  );
 }
 
 /**
  * Extract conversation history from the Gemini DOM.
- *
- * Primary: .user-query-text / .user-message for user,
- *   .model-response-text / .response-content for assistant.
- * Fallback: message-content, .conversation-turn in DOM order,
- *   alternating user/assistant.
  */
 function getConversationHistoryFromDOM(): Message[] {
   type RawMsg = { el: HTMLElement; role: "user" | "assistant" };
   const raw: RawMsg[] = [];
 
-  // Strategy 1: role-specific selectors
   const userEls = Array.from(
     document.querySelectorAll<HTMLElement>(
-      ".user-query-text, .user-message, [data-role='user']"
+      "div.user-query-text-line, div.user-query-text, .query-text, [data-role='user']"
     )
   );
   const assistantEls = Array.from(
     document.querySelectorAll<HTMLElement>(
-      ".model-response-text, .response-content, [data-role='assistant'], [data-role='model']"
+      "message-content p, .response-content, model-response p, [data-role='model']"
     )
   );
 
@@ -79,7 +63,6 @@ function getConversationHistoryFromDOM(): Message[] {
     userEls.forEach((el) => raw.push({ el, role: "user" }));
     assistantEls.forEach((el) => raw.push({ el, role: "assistant" }));
 
-    // Sort by DOM position
     raw.sort((a, b) => {
       const pos = a.el.compareDocumentPosition(b.el);
       return pos & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
@@ -91,7 +74,7 @@ function getConversationHistoryFromDOM(): Message[] {
       .slice(-MAX_HISTORY);
   }
 
-  // Fallback: generic turn containers, alternate user/assistant by position
+  // Fallback: generic turn containers
   const fallbackEls = Array.from(
     document.querySelectorAll<HTMLElement>(
       "message-content, .conversation-turn, .chat-turn"
@@ -148,12 +131,32 @@ export const geminiAdapter: SiteAdapter = {
       return;
     }
 
-    insertIntoContentEditable(el, text);
+    // Gemini rich-textarea p element — use specialized injection
+    insertIntoGeminiEditor(el, text);
   },
 
   getButtonAnchor(): HTMLElement | null {
-    const input = query(ANCHOR_SELECTORS);
-    return input?.parentElement ?? null;
+    const input = this.getPromptElement();
+    if (!input) return null;
+
+    // From DevTools: the trailing-actions-wrapper is a SIBLING of rich-textarea
+    // (not a child) containing the Fast dropdown and mic button.
+    // Prepend Clairity as its first child so it appears left of Fast/mic.
+    const richTextarea = input.closest("rich-textarea") as HTMLElement;
+    const inputContainer = richTextarea?.parentElement;
+    if (inputContainer) {
+      const trailingActions =
+        inputContainer.querySelector<HTMLElement>('[class*="trailing-actions"]') ??
+        inputContainer.querySelector<HTMLElement>('[class*="trailing"]');
+      if (trailingActions) {
+        trailingActions.setAttribute("data-clairity-inject", "prepend");
+        return trailingActions;
+      }
+    }
+
+    // Fallback: return rich-textarea or input
+    if (richTextarea) return richTextarea;
+    return input;
   },
 
   getConversationHistory(): Message[] {

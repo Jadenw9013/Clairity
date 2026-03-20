@@ -128,7 +128,7 @@ async function handleEnhance(): Promise<void> {
     return;
   }
 
-  const site = (siteEl?.value ?? "chatgpt") as "chatgpt" | "claude" | "gemini";
+  const site = (siteEl?.value ?? "chatgpt") as "chatgpt" | "claude" | "gemini" | "perplexity" | "grok" | "copilot" | "poe" | "huggingchat";
 
   setLoading(true);
   resultSectionEl.classList.add("hidden");
