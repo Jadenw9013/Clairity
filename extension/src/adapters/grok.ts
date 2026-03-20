@@ -97,9 +97,10 @@ export const grokAdapter: SiteAdapter = {
   },
 
   getButtonAnchor(): HTMLElement | null {
-    // Return the input element itself — "afterend" places the button
-    // right after the text area inside the query-bar flex container,
-    // next to where Grammarly and other extensions inject their icons.
+    // Return the input element — enhance-button.ts searches anchor.parentElement
+    // for Grammarly and inserts our button next to it on the right side.
+    // If no Grammarly, "afterend" places it right after the input in the
+    // query-bar flex row, next to the Auto/mic/waveform buttons.
     const input = this.getPromptElement();
     return input;
   },
