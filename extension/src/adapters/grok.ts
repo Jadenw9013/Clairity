@@ -97,24 +97,10 @@ export const grokAdapter: SiteAdapter = {
   },
 
   getButtonAnchor(): HTMLElement | null {
+    // Return the input element itself — "afterend" places the button
+    // right after the text area inside the query-bar flex container,
+    // next to where Grammarly and other extensions inject their icons.
     const input = this.getPromptElement();
-    if (!input) return null;
-
-    // Find the .query-bar container
-    const queryBar = input.closest(".query-bar") as HTMLElement;
-    if (queryBar) {
-      // Look for the first action button (attach/mic) inside query-bar
-      // so "afterend" places our button right next to it in the same row
-      const firstBtn = queryBar.querySelector<HTMLElement>(
-        'button[aria-label*="attach" i], button[aria-label*="mic" i], button[aria-label*="voice" i], button'
-      );
-      if (firstBtn) return firstBtn;
-      // If no button found, return the input element itself
-      // so the button appears right after it inside query-bar
-      return input;
-    }
-
-    // Fallback: return the input so button is a sibling inside its parent
     return input;
   },
 

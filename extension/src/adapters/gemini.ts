@@ -136,17 +136,11 @@ export const geminiAdapter: SiteAdapter = {
   },
 
   getButtonAnchor(): HTMLElement | null {
+    // Return the input element itself — "afterend" places the button
+    // right after the editable area inside the rich-textarea container,
+    // next to where Grammarly and other extensions inject their icons.
     const input = this.getPromptElement();
-    if (!input) return null;
-
-    // The rich-textarea web component sits inside a container div
-    // alongside a toolbar row with + Tools, Fast/model, and send buttons.
-    // Returning rich-textarea itself means "afterend" places our button
-    // as the next sibling — inside that same container row.
-    const richTextarea = input.closest("rich-textarea") as HTMLElement;
-    if (richTextarea) return richTextarea;
-
-    return input.parentElement;
+    return input;
   },
 
   getConversationHistory(): Message[] {
