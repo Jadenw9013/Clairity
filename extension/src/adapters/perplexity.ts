@@ -1,23 +1,19 @@
 import type { SiteAdapter, Message } from "shared/types/index.ts";
 
-/** Selector fallback chain for Gemini prompt input */
 const PROMPT_SELECTORS = [
-  "rich-textarea p",
-  'rich-textarea div[contenteditable="true"]',
-  'div.ql-editor[contenteditable="true"]',
-  'div[contenteditable="true"][aria-label*="Enter a prompt"]',
+  'textarea[placeholder*="Ask"]',
+  'div[contenteditable="true"][data-slate-editor="true"]',
+  "textarea#ask-input",
   "textarea",
 ];
 
-/** Selector fallback chain for button anchor */
 const ANCHOR_SELECTORS = [
-  "rich-textarea p",
-  'rich-textarea div[contenteditable="true"]',
-  'div.ql-editor[contenteditable="true"]',
+  'textarea[placeholder*="Ask"]',
+  'div[contenteditable="true"][data-slate-editor="true"]',
+  "textarea#ask-input",
   "textarea",
 ];
 
-/** Max messages to extract from DOM */
 const MAX_HISTORY = 20;
 
 function query(selectors: string[]): HTMLElement | null {
@@ -25,93 +21,58 @@ function query(selectors: string[]): HTMLElement | null {
     try {
       const el = document.querySelector<HTMLElement>(sel);
       if (el) return el;
-    } catch {
-      // Invalid selector — skip
-    }
+    } catch { /* skip */ }
   }
   return null;
 }
 
 function insertIntoContentEditable(el: HTMLElement, text: string): void {
   el.focus();
-
   const selection = window.getSelection();
-  if (selection) {
-    selection.selectAllChildren(el);
-    selection.deleteFromDocument();
-  }
-
+  if (selection) { selection.selectAllChildren(el); selection.deleteFromDocument(); }
   if (typeof document.execCommand === "function") {
     const inserted = document.execCommand("insertText", false, text);
     if (inserted) return;
   }
-
   el.textContent = text;
   el.dispatchEvent(new InputEvent("input", { bubbles: true }));
 }
 
-/**
- * Extract conversation history from the Gemini DOM.
- *
- * Primary: user-query-text-line / user-query-text for user,
- *   message-content p / response-content for assistant.
- * Fallback: message-content, .conversation-turn in DOM order.
- */
 function getConversationHistoryFromDOM(): Message[] {
   type RawMsg = { el: HTMLElement; role: "user" | "assistant" };
   const raw: RawMsg[] = [];
 
-  // Strategy 1: role-specific selectors
   const userEls = Array.from(
     document.querySelectorAll<HTMLElement>(
-      "div.user-query-text-line, div.user-query-text, .query-text, [data-role='user']"
+      '[data-testid="user-message"], .user-message, div[class*="UserMessage"]'
     )
   );
   const assistantEls = Array.from(
     document.querySelectorAll<HTMLElement>(
-      "message-content p, .response-content, model-response p, [data-role='model']"
+      '[data-testid="answer"], div[class*="Answer"], div[class*="ProAnswer"]'
     )
   );
 
   if (userEls.length > 0 || assistantEls.length > 0) {
     userEls.forEach((el) => raw.push({ el, role: "user" }));
     assistantEls.forEach((el) => raw.push({ el, role: "assistant" }));
-
-    // Sort by DOM position
     raw.sort((a, b) => {
       const pos = a.el.compareDocumentPosition(b.el);
       return pos & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
     });
-
     return raw
       .map(({ el, role }) => ({ role, content: el.textContent?.trim() ?? "" }))
       .filter((m) => m.content.length > 0)
       .slice(-MAX_HISTORY);
   }
 
-  // Fallback: generic turn containers, alternate user/assistant by position
-  const fallbackEls = Array.from(
-    document.querySelectorAll<HTMLElement>(
-      "message-content, .conversation-turn, .chat-turn"
-    )
-  );
-  if (fallbackEls.length > 0) {
-    return fallbackEls
-      .slice(-MAX_HISTORY)
-      .map((el, i) => ({
-        role: (i % 2 === 0 ? "user" : "assistant") as "user" | "assistant",
-        content: el.textContent?.trim() ?? "",
-      }))
-      .filter((m) => m.content.length > 0);
-  }
-
   return [];
 }
 
-export const geminiAdapter: SiteAdapter = {
-  id: "gemini",
-  name: "Gemini",
-  urlPattern: /^https:\/\/gemini\.google\.com/,
+export const perplexityAdapter: SiteAdapter = {
+  id: "perplexity",
+  name: "Perplexity",
+  urlPattern: /^https:\/\/(www\.)?perplexity\.ai/,
 
   detect(): boolean {
     return this.urlPattern.test(window.location.origin);
@@ -131,35 +92,23 @@ export const geminiAdapter: SiteAdapter = {
   setPromptText(text: string): void {
     const el = this.getPromptElement();
     if (!el) return;
-
     if (el instanceof HTMLTextAreaElement) {
-      const nativeSetter = Object.getOwnPropertyDescriptor(
-        HTMLTextAreaElement.prototype,
-        "value"
-      )?.set;
-      if (nativeSetter) {
-        nativeSetter.call(el, text);
-      } else {
-        el.value = text;
-      }
+      const nativeSetter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value")?.set;
+      if (nativeSetter) { nativeSetter.call(el, text); } else { el.value = text; }
       el.dispatchEvent(new Event("input", { bubbles: true }));
       return;
     }
-
     insertIntoContentEditable(el, text);
   },
 
   getButtonAnchor(): HTMLElement | null {
     const input = query(ANCHOR_SELECTORS);
-    if (!input) return null;
-    return input.closest("rich-textarea") as HTMLElement ?? input.parentElement;
+    return input?.parentElement ?? null;
   },
 
   getConversationHistory(): Message[] {
     return getConversationHistoryFromDOM();
   },
 
-  destroy(): void {
-    // Stateless — nothing to clean up
-  },
+  destroy(): void {},
 };

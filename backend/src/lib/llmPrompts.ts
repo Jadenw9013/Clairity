@@ -153,7 +153,18 @@ export function buildSystemPrompt(
   brief?: ConversationBrief,
   messageCount?: number
 ): string {
-  const siteLabel = site === "chatgpt" ? "ChatGPT" : site === "claude" ? "Claude" : site === "vscode" ? "VS Code / IDE" : "Gemini";
+  const SITE_LABELS: Record<string, string> = {
+    chatgpt: "ChatGPT",
+    claude: "Claude",
+    gemini: "Gemini",
+    vscode: "VS Code / IDE",
+    perplexity: "Perplexity",
+    grok: "Grok",
+    copilot: "Microsoft Copilot",
+    poe: "Poe",
+    huggingchat: "HuggingChat",
+  };
+  const siteLabel = SITE_LABELS[site] ?? site;
   const count = messageCount ?? brief?.messageCount ?? history.length;
 
   // ── STATE 2 / 3: Brief active ──────────────────────────────────────────

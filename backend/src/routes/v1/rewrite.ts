@@ -24,7 +24,7 @@ const briefSchema = z.object({
 const rewriteSchema = z.object({
   prompt: z.string().min(1, "Prompt is required").max(10000),
   history: z.array(messageSchema).max(40).default([]),
-  site: z.enum(["chatgpt", "claude", "gemini", "vscode"]),
+  site: z.enum(["chatgpt", "claude", "gemini", "vscode", "perplexity", "grok", "copilot", "poe", "huggingchat"]),
   brief: briefSchema.optional(),
 });
 

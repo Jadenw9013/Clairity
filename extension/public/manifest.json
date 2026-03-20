@@ -17,7 +17,17 @@
     "http://localhost:3001/*",
     "https://chat.openai.com/*",
     "https://chatgpt.com/*",
-    "https://claude.ai/*"
+    "https://claude.ai/*",
+    "https://gemini.google.com/*",
+    "https://perplexity.ai/*",
+    "https://www.perplexity.ai/*",
+    "https://grok.x.com/*",
+    "https://grok.com/*",
+    "https://x.com/i/grok*",
+    "https://copilot.microsoft.com/*",
+    "https://www.bing.com/chat*",
+    "https://poe.com/*",
+    "https://huggingface.co/chat*"
   ],
   "action": {
     "default_popup": "popup/index.html",
@@ -36,7 +46,17 @@
       "matches": [
         "https://chat.openai.com/*",
         "https://chatgpt.com/*",
-        "https://claude.ai/*"
+        "https://claude.ai/*",
+        "https://gemini.google.com/*",
+        "https://perplexity.ai/*",
+        "https://www.perplexity.ai/*",
+        "https://grok.x.com/*",
+        "https://grok.com/*",
+        "https://x.com/i/grok*",
+        "https://copilot.microsoft.com/*",
+        "https://www.bing.com/chat*",
+        "https://poe.com/*",
+        "https://huggingface.co/chat*"
       ],
       "js": [
         "content.js"

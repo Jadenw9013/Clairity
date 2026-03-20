@@ -91,7 +91,7 @@ interface RewriteMessage {
   type: "REWRITE_PROMPT";
   payload: {
     prompt: string;
-    site: "chatgpt" | "claude" | "gemini";
+    site: "chatgpt" | "claude" | "gemini" | "perplexity" | "grok" | "copilot" | "poe" | "huggingchat";
     conversationId: string;
     history?: Message[];
     brief?: ConversationBrief;
