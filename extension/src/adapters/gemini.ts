@@ -138,12 +138,24 @@ export const geminiAdapter: SiteAdapter = {
   getButtonAnchor(): HTMLElement | null {
     const input = this.getPromptElement();
     if (!input) return null;
-    // Return the rich-textarea's parent container — this is the div that holds
-    // both the editable area and Grammarly's icon. The Grammarly-aware injection
-    // in enhance-button.ts will find Grammarly inside this container and place
-    // our button right next to it.
+
+    // From DevTools: the trailing-actions-wrapper is a SIBLING of rich-textarea
+    // (not a child) containing the Fast dropdown and mic button.
+    // Prepend Clairity as its first child so it appears left of Fast/mic.
     const richTextarea = input.closest("rich-textarea") as HTMLElement;
-    if (richTextarea?.parentElement) return richTextarea;
+    const inputContainer = richTextarea?.parentElement;
+    if (inputContainer) {
+      const trailingActions =
+        inputContainer.querySelector<HTMLElement>('[class*="trailing-actions"]') ??
+        inputContainer.querySelector<HTMLElement>('[class*="trailing"]');
+      if (trailingActions) {
+        trailingActions.setAttribute("data-clairity-inject", "prepend");
+        return trailingActions;
+      }
+    }
+
+    // Fallback: return rich-textarea or input
+    if (richTextarea) return richTextarea;
     return input;
   },
 

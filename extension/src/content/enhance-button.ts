@@ -302,16 +302,23 @@ export function injectEnhanceButton(
     }
   });
 
-  // Smart injection: place button next to Grammarly icon if present,
-  // otherwise fall back to inserting after the anchor element.
-  const searchContainer = anchor.parentElement ?? anchor;
-  const grammarlyEl = searchContainer.querySelector(
-    'grammarly-extension, grammarly-desktop-integration, [data-grammarly-shadow-root], [id*="grammarly"]'
-  );
-  if (grammarlyEl && grammarlyEl.parentElement) {
-    // Insert Clairity immediately to the LEFT of Grammarly
-    grammarlyEl.parentElement.insertBefore(host, grammarlyEl);
+  // Smart injection: supports three strategies
+  // 1. Adapter explicitly wants prepend (toolbar container) via data attribute
+  // 2. Grammarly-adjacent: insert left of Grammarly icon
+  // 3. Default: insert after anchor element
+  const injectMode = anchor.getAttribute("data-clairity-inject");
+  if (injectMode === "prepend") {
+    anchor.removeAttribute("data-clairity-inject");
+    anchor.insertBefore(host, anchor.firstChild);
   } else {
-    anchor.insertAdjacentElement("afterend", host);
+    const searchContainer = anchor.parentElement ?? anchor;
+    const grammarlyEl = searchContainer.querySelector(
+      'grammarly-extension, grammarly-desktop-integration, [data-grammarly-shadow-root], [id*="grammarly"]'
+    );
+    if (grammarlyEl && grammarlyEl.parentElement) {
+      grammarlyEl.parentElement.insertBefore(host, grammarlyEl);
+    } else {
+      anchor.insertAdjacentElement("afterend", host);
+    }
   }
 }

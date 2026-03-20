@@ -97,11 +97,23 @@ export const grokAdapter: SiteAdapter = {
   },
 
   getButtonAnchor(): HTMLElement | null {
-    // Return the input element — enhance-button.ts searches anchor.parentElement
-    // for Grammarly and inserts our button next to it on the right side.
-    // If no Grammarly, "afterend" places it right after the input in the
-    // query-bar flex row, next to the Auto/mic/waveform buttons.
     const input = this.getPromptElement();
+    if (!input) return null;
+
+    // From DevTools: the right-side button group inside the query-bar bottom row
+    // contains [Auto dropdown, mic, waveform]. Prepend Clairity as its first child.
+    const queryBar = input.closest(".query-bar") as HTMLElement;
+    if (queryBar) {
+      const rightButtons = queryBar.querySelector<HTMLElement>(
+        'div[class*="grow"][class*="flex"][class*="items-center"]'
+      );
+      if (rightButtons) {
+        rightButtons.setAttribute("data-clairity-inject", "prepend");
+        return rightButtons;
+      }
+    }
+
+    // Fallback: use the input itself
     return input;
   },
 
