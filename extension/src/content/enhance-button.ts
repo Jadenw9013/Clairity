@@ -153,16 +153,65 @@ function showPreviewCard(
   const useBtn = document.createElement("button");
   useBtn.className = "cl-btn-use";
   useBtn.innerHTML = `<span class="cl-star">✦</span> Use this prompt`;
-  useBtn.addEventListener("click", () => {
+
+  /** Inject the enhanced prompt into the chat input */
+  const doInject = () => {
     adapter.setPromptText(enhancedPrompt);
     const el = adapter.getPromptElement();
     if (el) {
       el.dispatchEvent(new Event("input", { bubbles: true }));
       el.dispatchEvent(new Event("change", { bubbles: true }));
-      // Try to focus the field so user can send immediately
       if ("focus" in el) (el as HTMLElement).focus();
     }
-    dismissCard();
+  };
+
+  useBtn.addEventListener("click", () => {
+    if (adapter.isGenerating()) {
+      // Queued state — wait for AI to finish generating
+      useBtn.disabled = true;
+      useBtn.classList.add("is-queued");
+      useBtn.innerHTML = `<span class="cl-spinner-sm"></span> Queued — waiting for AI`;
+
+      // Add hint below actions
+      const queueHint = document.createElement("div");
+      queueHint.className = "cl-queue-hint";
+      queueHint.textContent = "Will inject automatically when ready";
+      root.appendChild(queueHint);
+
+      const pollInterval = setInterval(() => {
+        if (!adapter.isGenerating()) {
+          clearInterval(pollInterval);
+          clearTimeout(pollTimeout);
+          doInject();
+          // Flash injected state then dismiss
+          useBtn.innerHTML = `<span class="cl-star">✦</span> Injected`;
+          useBtn.classList.remove("is-queued");
+          useBtn.classList.add("is-injected");
+          queueHint.remove();
+          setTimeout(dismissCard, 1500);
+        }
+      }, 500);
+
+      const pollTimeout = setTimeout(() => {
+        clearInterval(pollInterval);
+        // Timed out — re-enable manual injection
+        useBtn.disabled = false;
+        useBtn.classList.remove("is-queued");
+        useBtn.classList.add("is-timed-out");
+        useBtn.innerHTML = `<span class="cl-star">✦</span> AI took too long — click to inject`;
+        queueHint.remove();
+        // Re-bind to direct inject on next click
+        useBtn.addEventListener("click", () => {
+          doInject();
+          dismissCard();
+        }, { once: true });
+      }, 60_000);
+
+    } else {
+      // Normal path — inject immediately
+      doInject();
+      dismissCard();
+    }
   });
 
   const copyBtn = document.createElement("button");

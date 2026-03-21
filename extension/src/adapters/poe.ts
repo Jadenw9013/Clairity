@@ -110,5 +110,7 @@ export const poeAdapter: SiteAdapter = {
     return getConversationHistoryFromDOM();
   },
 
+  isGenerating(): boolean { return false; },
+
   destroy(): void {},
 };

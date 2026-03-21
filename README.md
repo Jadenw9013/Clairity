@@ -1,7 +1,8 @@
 # Clairity
 
-> Enhance your prompts on ChatGPT, Claude, and Gemini using
-> conversation context and the Lyra optimization framework.
+> Enhance your prompts on ChatGPT, Claude, Gemini, Google AI Search,
+> Perplexity, Microsoft Copilot, M365 Copilot, Grok, Poe, and HuggingChat
+> using conversation context and the Lyra optimization framework.
 
 ## Install & Use (5 minutes)
 
@@ -48,13 +49,13 @@ structured prompts for better LLM outputs.
 
 ```
 ┌─────────────┐     HTTPS      ┌─────────────┐      ┌──────────────┐
-│  Extension   │ ──────────────→│  Backend API │─────→│ LLM Provider │
-│  (MV3)       │←──────────────│  (/v1)       │←─────│ (OpenAI etc) │
+│  Extension   │ ──────────────→│  Backend API │─────→│  Anthropic   │
+│  (MV3)       │←──────────────│  (/v1)       │←─────│  Claude API  │
 └─────────────┘    JSON         └─────────────┘      └──────────────┘
 ```
 
-**Security rule:** The extension never holds LLM provider API keys.
-All LLM calls are mediated through the backend.
+Users provide their own Anthropic API key via the extension popup.
+Keys are stored in `chrome.storage.local` and passed via `x-api-key` header.
 
 ## Quick Start
 
@@ -95,32 +96,25 @@ npm test
 ## Project Structure
 
 ```
-extension/   Chrome extension (Manifest V3, TypeScript)
-backend/     API server (Node.js, TypeScript)
+extension/   Chrome extension (Manifest V3, TypeScript, 8 site adapters)
+backend/     API server (Express, TypeScript, Lyra engine)
 shared/      Shared types and utilities
-docs/        Architecture, security, workflow docs
-specs/       API contracts, system specifications
-agents/      AI agent instruction files
 ```
 
-## Documentation
+## Supported Sites
 
-- [Architecture](docs/architecture.md) — system design and data flow
-- [Security](docs/security.md) — threat model and mitigations
-- [Workflow](docs/workflow.md) — development conventions
-
-## Specifications
-
-- [API Contract](specs/api-contract.md) — endpoint schemas
-- [Adapter System](specs/adapter-system.md) — site integration pattern
-- [Rewrite Engine](specs/rewrite-engine.md) — prompt rewrite pipeline
-- [Auth System](specs/auth-system.md) — authentication design
-
-## Agent Instructions
-
-See `agents/` directory for role-specific AI agent prompts:
-`backend-agent`, `extension-agent`, `security-agent`,
-`testing-agent`, `release-agent`.
+| Site | Adapter | Editor type |
+|------|---------|-------------|
+| ChatGPT | `chatgpt.ts` | Textarea |
+| Claude | `claude.ts` | ProseMirror |
+| Gemini | `gemini.ts` | rich-textarea |
+| Google AI Search | `gemini.ts` | rich-textarea |
+| Perplexity | `perplexity.ts` | Slate.js |
+| Copilot | `copilot.ts` | Lexical |
+| M365 Copilot | `copilot.ts` | Lexical |
+| Grok | `grok.ts` | contenteditable |
+| Poe | `poe.ts` | contenteditable |
+| HuggingChat | `huggingchat.ts` | textarea |
 
 ## Constraints
 

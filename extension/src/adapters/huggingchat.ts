@@ -106,5 +106,7 @@ export const huggingChatAdapter: SiteAdapter = {
     return getConversationHistoryFromDOM();
   },
 
+  isGenerating(): boolean { return false; },
+
   destroy(): void {},
 };

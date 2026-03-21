@@ -84,6 +84,9 @@ export interface SiteAdapter {
   /** Read existing conversation messages from the page DOM. Returns [] if none found. */
   getConversationHistory(): Message[];
 
+  /** Check if the AI is currently generating a response (stop button visible) */
+  isGenerating(): boolean;
+
   /** Clean up when adapter is deactivated */
   destroy(): void;
 }

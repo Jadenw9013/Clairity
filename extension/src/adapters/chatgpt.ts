@@ -161,6 +161,13 @@ export const chatgptAdapter: SiteAdapter = {
     return getConversationHistoryFromDOM();
   },
 
+  isGenerating(): boolean {
+    return !!(
+      document.querySelector('[data-testid="stop-button"]') ??
+      document.querySelector('button[aria-label*="Stop" i]')
+    );
+  },
+
   destroy(): void {
     // Stateless — nothing to clean up
   },

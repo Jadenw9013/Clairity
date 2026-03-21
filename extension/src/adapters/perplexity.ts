@@ -136,5 +136,12 @@ export const perplexityAdapter: SiteAdapter = {
     return getConversationHistoryFromDOM();
   },
 
+  isGenerating(): boolean {
+    return !!(
+      document.querySelector('button[aria-label*="Stop" i]') ??
+      document.querySelector('[class*="stop"]')
+    );
+  },
+
   destroy(): void { },
 };

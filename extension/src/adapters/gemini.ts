@@ -164,6 +164,14 @@ export const geminiAdapter: SiteAdapter = {
     return getConversationHistoryFromDOM();
   },
 
+  isGenerating(): boolean {
+    return !!(
+      document.querySelector('button[aria-label*="Stop" i]') ??
+      document.querySelector('.stop-button') ??
+      document.querySelector('[mattooltip*="Stop" i]')
+    );
+  },
+
   destroy(): void {
     // Stateless — nothing to clean up
   },

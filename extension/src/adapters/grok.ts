@@ -143,5 +143,7 @@ export const grokAdapter: SiteAdapter = {
     return getConversationHistoryFromDOM();
   },
 
+  isGenerating(): boolean { return false; },
+
   destroy(): void {},
 };

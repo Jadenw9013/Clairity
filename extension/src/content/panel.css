@@ -343,3 +343,29 @@
   margin: 6px 16px 0;
   opacity: 0.6;
 }
+
+/* Queued injection states */
+.cl-btn-use.is-queued {
+  opacity: 0.6;
+  cursor: wait;
+  font-size: 12px;
+}
+
+.cl-btn-use.is-injected {
+  background: #22c55e;
+  color: #fff;
+  pointer-events: none;
+}
+
+.cl-btn-use.is-timed-out {
+  background: #f59e0b;
+  color: #000;
+  font-size: 12px;
+}
+
+.cl-queue-hint {
+  font-size: 11px;
+  color: var(--color-text-secondary, rgba(255, 255, 255, 0.35));
+  margin: 6px 16px 0;
+  text-align: center;
+}

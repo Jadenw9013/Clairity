@@ -188,6 +188,14 @@ export const claudeAdapter: SiteAdapter = {
     return getConversationHistoryFromDOM();
   },
 
+  isGenerating(): boolean {
+    return !!(
+      document.querySelector('button[aria-label*="Stop" i]') ??
+      document.querySelector('[data-testid*="stop"]') ??
+      document.querySelector('button.stop-button')
+    );
+  },
+
   destroy(): void {
     // Stateless — nothing to clean up
   },
