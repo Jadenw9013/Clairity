@@ -96,10 +96,10 @@ function getConversationHistoryFromDOM(): Message[] {
 export const geminiAdapter: SiteAdapter = {
   id: "gemini",
   name: "Gemini",
-  urlPattern: /^https:\/\/gemini\.google\.com/,
+  urlPattern: /^https:\/\/(gemini\.google\.com|www\.google\.com\/search|google\.com)/,
 
   detect(): boolean {
-    return this.urlPattern.test(window.location.origin);
+    return this.urlPattern.test(window.location.origin + window.location.pathname);
   },
 
   getPromptElement(): HTMLElement | null {

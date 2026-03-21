@@ -94,7 +94,7 @@ describe("callLyra", () => {
     // Verify history array was forwarded to the LLM call
     const llmArgs = mockCallLlm.mock.calls[0]![0] as { messages: unknown[] };
     expect(llmArgs.messages).toHaveLength(1); // only the current prompt (no history)
-    expect(llmArgs.messages[0]).toMatchObject({ role: "user", content: "explain closures" });
+    expect(llmArgs.messages[0]).toMatchObject({ role: "user", content: "<prompt_to_optimize>explain closures</prompt_to_optimize>" });
   });
 
   it("forwards non-empty history to the LLM call (no brief, small history)", async () => {
@@ -112,7 +112,7 @@ describe("callLyra", () => {
     const llmArgs = mockCallLlm.mock.calls[0]![0] as { messages: unknown[] };
     // history (2) + current prompt (1) = 3 messages
     expect(llmArgs.messages).toHaveLength(3);
-    expect(llmArgs.messages[2]).toMatchObject({ role: "user", content: "give me a code example" });
+    expect(llmArgs.messages[2]).toMatchObject({ role: "user", content: "<prompt_to_optimize>give me a code example</prompt_to_optimize>" });
   });
 
   it("returns original prompt unchanged when LLM times out (null result)", async () => {
@@ -172,7 +172,7 @@ describe("callLyra", () => {
     // Only the current prompt should be in messages — no history
     const llmArgs = mockCallLlm.mock.calls[0]![0] as { messages: unknown[] };
     expect(llmArgs.messages).toHaveLength(1);
-    expect(llmArgs.messages[0]).toMatchObject({ role: "user", content: "next question" });
+    expect(llmArgs.messages[0]).toMatchObject({ role: "user", content: "<prompt_to_optimize>next question</prompt_to_optimize>" });
   });
 
   it("sends last 8 messages + current prompt when no brief and 20+ messages", async () => {
@@ -188,7 +188,7 @@ describe("callLyra", () => {
     const llmArgs = mockCallLlm.mock.calls[0]![0] as { messages: unknown[] };
     // 8 trimmed history + 1 current prompt = 9
     expect(llmArgs.messages).toHaveLength(9);
-    expect(llmArgs.messages[8]).toMatchObject({ role: "user", content: "follow up" });
+    expect(llmArgs.messages[8]).toMatchObject({ role: "user", content: "<prompt_to_optimize>follow up</prompt_to_optimize>" });
   });
 
   it("sends last 4 messages + current prompt when brief active and 6–19 messages", async () => {
@@ -204,7 +204,7 @@ describe("callLyra", () => {
     const llmArgs = mockCallLlm.mock.calls[0]![0] as { messages: unknown[] };
     // 4 trimmed history + 1 current prompt = 5
     expect(llmArgs.messages).toHaveLength(5);
-    expect(llmArgs.messages[4]).toMatchObject({ role: "user", content: "another question" });
+    expect(llmArgs.messages[4]).toMatchObject({ role: "user", content: "<prompt_to_optimize>another question</prompt_to_optimize>" });
   });
 });
 

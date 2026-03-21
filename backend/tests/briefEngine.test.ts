@@ -167,7 +167,7 @@ describe("buildSystemPrompt", () => {
   it("uses raw history block when no brief is provided", () => {
     const system = buildSystemPrompt(sampleHistory, "gemini");
 
-    expect(system).toContain("Recent conversation:");
+    expect(system).toContain("CONVERSATION HISTORY");
     expect(system).not.toContain("CONVERSATION BRIEF");
     expect(system).toContain("Gemini");
   });
@@ -175,7 +175,7 @@ describe("buildSystemPrompt", () => {
   it("uses cold-start message when history is empty and no brief", () => {
     const system = buildSystemPrompt([], "chatgpt");
 
-    expect(system).toContain("no prior conversation history");
+    expect(system).toContain("No prior context");
     expect(system).toContain("ChatGPT");
   });
 
@@ -192,6 +192,6 @@ describe("buildSystemPrompt", () => {
 
     expect(system).toContain(longBrief.goal);
     expect(system).not.toContain("Most recent exchange:");
-    expect(system).toContain("conversation is long");
+    expect(system).toContain("Optimize for continuity");
   });
 });

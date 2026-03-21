@@ -32,7 +32,8 @@ function showPreviewCard(
   enhancedPrompt: string,
   historyLength: number,
   adapter: SiteAdapter,
-  brief?: ConversationBrief
+  brief?: ConversationBrief,
+  originalPrompt?: string
 ): void {
   dismissCard();
 
@@ -133,6 +134,17 @@ function showPreviewCard(
   preview.className = "cl-card-preview";
   preview.textContent = enhancedPrompt;
   root.appendChild(preview);
+
+  // Hint when enhanced prompt is nearly identical to original
+  if (originalPrompt) {
+    const norm = (s: string) => s.trim().toLowerCase();
+    if (norm(originalPrompt) === norm(enhancedPrompt)) {
+      const hint = document.createElement("div");
+      hint.className = "cl-vague-hint";
+      hint.textContent = "✦ Tip: add more context for a better optimization";
+      root.appendChild(hint);
+    }
+  }
 
   // Actions
   const actions = document.createElement("div");
@@ -298,7 +310,7 @@ export function injectEnhanceButton(
         showErrorCard("No response from service worker — try reloading the extension.");
       } else if (response.type === "REWRITE_RESULT") {
         const data = response.payload as RewriteResponse & { briefActive: boolean; brief?: ConversationBrief };
-        showPreviewCard(data.enhanced_prompt, data.history_length, adapter, data.briefActive ? data.brief : undefined);
+        showPreviewCard(data.enhanced_prompt, data.history_length, adapter, data.briefActive ? data.brief : undefined, prompt);
       } else if (response.type === "REWRITE_ERROR") {
         const data = response.payload as ErrorResponse;
         showErrorCard(data.error || "Unknown error from backend");

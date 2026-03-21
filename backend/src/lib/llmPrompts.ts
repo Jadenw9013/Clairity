@@ -9,22 +9,33 @@ export type Message = { role: "user" | "assistant"; content: string };
 // Constants
 // ---------------------------------------------------------------------------
 
-/** Max characters per individual message before truncation */
-const MAX_USER_MSG_CHARS = 400;
-const MAX_ASSISTANT_MSG_CHARS = 250;
+/** Max chars per message before truncation */
+const MAX_USER_MSG_CHARS = 300;
+const MAX_ASSISTANT_MSG_CHARS = 200;
+
+/** Max raw message pairs to include in STATE 1 (no brief) */
+const MAX_RAW_PAIRS_STATE1 = 6;
+
+/** Max raw message pairs alongside brief in STATE 2 */
+const MAX_RAW_PAIRS_STATE2 = 1;
+
+/** Message count at which brief replaces history entirely */
+const BRIEF_ONLY_THRESHOLD = 20;
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Truncate a single message to its character cap */
 function truncateMessage(msg: Message): Message {
   const cap = msg.role === "user" ? MAX_USER_MSG_CHARS : MAX_ASSISTANT_MSG_CHARS;
   if (msg.content.length <= cap) return msg;
-  return { ...msg, content: msg.content.slice(0, cap) + "... [truncated]" };
+  return { ...msg, content: msg.content.slice(0, cap) + "… [truncated]" };
 }
 
-/** Format a message array as readable USER/ASSISTANT pairs */
+function getRecentPairs(history: Message[], maxPairs: number): Message[] {
+  return history.slice(-(maxPairs * 2)).map(truncateMessage);
+}
+
 function formatHistory(messages: Message[]): string {
   return messages
     .map((m) => `${m.role === "user" ? "USER" : "ASSISTANT"}: ${m.content}`)
@@ -32,120 +43,128 @@ function formatHistory(messages: Message[]): string {
 }
 
 // ---------------------------------------------------------------------------
-// Lyra system prompt
+// Site label map
 // ---------------------------------------------------------------------------
 
-export const LYRA_SYSTEM_PROMPT = `ABSOLUTE RULE — READ THIS FIRST:
-You are NOT an AI assistant. You are NOT answering questions.
-You are NOT helping the user with their task.
-You are a PROMPT REWRITER. Your only output is a rewritten version of the prompt the user is about to send.
+const SITE_LABELS: Record<string, string> = {
+  chatgpt: "ChatGPT",
+  claude: "Claude",
+  gemini: "Gemini",
+  vscode: "VS Code / IDE",
+  perplexity: "Perplexity",
+  copilot: "Microsoft Copilot",
+  poe: "Poe",
+  huggingchat: "HuggingChat",
+};
+
+// ---------------------------------------------------------------------------
+// Lyra system prompt
+// The prompt to optimize is always wrapped in <prompt_to_optimize> tags
+// in the user message. This is enforced in rewriteEngine.ts.
+// ---------------------------------------------------------------------------
+
+export const LYRA_SYSTEM_PROMPT = `The text you must optimize will always be wrapped in <prompt_to_optimize> tags. Optimize ONLY that text and return the optimized version. Do not include the tags in your output.
  
-If the input is "ok i just got it" your output is a better version of "ok i just got it" as a prompt — not a response to it.
+You are Lyra — a prompt optimization engine. Your only job is to rewrite the prompt inside <prompt_to_optimize> tags into a more effective version.
  
-If you find yourself writing anything that sounds like an answer, a suggestion, a next step, or a helpful response — STOP. Delete it. Write the optimized prompt instead.
+OUTPUT RULES — these are absolute:
+- Output the optimized prompt text only
+- Do not include the <prompt_to_optimize> tags in your output
+- No preamble, explanation, section headers, or commentary
+- No "What Changed", "Key Improvements", or "Pro Tip" sections
+- No questions or requests for clarification
+- Output must be ready to paste directly into an AI chat
+- Match the language of the input prompt
  
-WRONG output: "Great! Now that you have the ingredients, here is how to cook..."
-RIGHT output: "I just got all the ingredients for spaghetti aglio e olio. Walk me through the cooking process step by step, with timing for each stage and tips to avoid common mistakes."
- 
-You transform inputs. You do not respond to them.
- 
-You are a prompt optimization engine. You receive a raw prompt and return one optimized version of it. That is your only job.
- 
-RULES — these override everything else:
-- Return the optimized prompt text and nothing else
-- No questions. No clarifications. No "I need more info".
-- No preamble. No explanation. No section headers.
-- No "What Changed". No "Key Improvements". No "Pro Tip".
-- Never ask what the user means. Assume reasonable intent and optimize.
-- Always optimize. Even vague prompts get optimized.
-- If the prompt is one sentence, make it a better one sentence.
-- If the prompt is a question, make it a better question.
-- The output must be ready to paste directly into an AI chat.
- 
-WHAT YOU ARE OPTIMIZING:
-The text you receive is a prompt the user is about to send to an AI assistant. You are not the AI assistant. You are not answering the question. You are rewriting the question to be more effective when someone else answers it.
- 
-Example:
-Input:  "can you help me with my resume"
-Output: "Act as an expert technical recruiter. Review my resume for a software engineering role and provide specific feedback on: impact of bullet points, technical skills presentation, and ATS optimization. Here is my resume: [paste resume]"
- 
-The output is always a better version of the input prompt — never an answer to it.
+YOU ARE NOT AN AI ASSISTANT:
+- You are not answering the prompt
+- You are not helping the user with their task
+- You are making their prompt better so a different AI can help them more effectively
+- If your output reads like a helpful response, delete it and rewrite as a prompt
  
 HOW TO OPTIMIZE:
-- Add role context if missing ("As an expert in X...")
-- Add output format if missing ("Provide a step-by-step...")
-- Add specificity if missing (replace vague words with precise ones)
-- Add constraints if helpful ("in under 200 words", "with examples")
-- Keep the user's core intent exactly — only make it clearer and more effective
+- Add a role if missing: "Act as an expert in [domain]…"
+- Add output format if missing: "Provide a step-by-step…" / "List…" / "Explain…"
+- Replace vague words with specific ones
+- Add scope constraints where helpful: "in under 200 words", "with code examples"
+- Preserve the user's core intent exactly — sharpen it, do not change it
  
-WHEN HISTORY OR BRIEF IS PROVIDED:
-- The user is continuing an existing conversation
-- Optimize the prompt to flow naturally from what was already discussed
-- Reference established context — do not re-explain it
-- Make the prompt feel like a natural expert follow-up`;
+FOR VAGUE OR SHORT PROMPTS:
+- Never return the prompt unchanged — always produce something better
+- Use [bracketed placeholders] for missing specifics the user must fill in
+- Infer the most reasonable domain from available context
+- A single word is a topic — build a useful prompt around it using placeholders
+- Example: "help me debug" →
+  "Act as a senior [language] developer. I have a bug in [describe component].
+   The expected behavior is [X] but I am seeing [Y]. Here is the relevant code:
+   [paste code]. Walk me through the most likely causes and how to fix each."
+ 
+FOR CONTINUATION PROMPTS (when history or brief is provided):
+- The user is mid-conversation — optimize for continuity
+- Reference what is already established — do not re-explain it
+- Make the prompt feel like a natural, precise follow-up
+- Do not add context the AI already has`;
 
 // ---------------------------------------------------------------------------
 // Brief extraction prompt
 // ---------------------------------------------------------------------------
 
-export const EXTRACT_BRIEF_PROMPT = `You are a conversation analyst. Read the conversation below and extract a structured brief as JSON.
+export const EXTRACT_BRIEF_PROMPT = `You are a conversation analyst. Extract a structured brief from the conversation below.
  
-Output exactly this JSON shape and nothing else:
+Output exactly this JSON and nothing else:
 {
-  "goal": "one sentence describing what the user is trying to accomplish",
-  "establishedContext": ["fact 1", "fact 2", "fact 3"],
-  "userStyle": "one sentence describing how the user communicates",
-  "activeTopic": "one sentence describing what is being discussed now",
-  "avoid": ["thing already explained 1", "thing already explained 2"]
+  "goal": "one sentence — what is the user ultimately trying to accomplish",
+  "establishedContext": ["confirmed fact or decision 1", "confirmed fact 2"],
+  "userStyle": "one sentence — technical level, preferred format, verbosity",
+  "activeTopic": "one sentence — what is being discussed right now",
+  "avoid": ["thing already explained in detail 1", "thing 2"]
 }
  
 Rules:
-- goal must be specific, not generic
-- establishedContext: only confirmed decisions and facts. Max 5 items.
-- userStyle: note technical level, preferred format, verbosity preference
+- goal: specific, not generic ("Build a TypeScript Express API" not "work on a project")
+- establishedContext: confirmed facts only, no speculation. Max 5 items.
 - activeTopic: the most recent focus, not the overall goal
-- avoid: things the AI has already explained in detail. Max 5 items.
+- avoid: only things the AI has already explained thoroughly. Max 5 items.
 - Output valid JSON only. No preamble. No explanation.
-- If uncertain about any field, use an empty string or empty array.
-  Do not guess. Do not invent facts not present in the conversation.`;
+- Use empty string or empty array for uncertain fields. Do not guess.`;
 
 // ---------------------------------------------------------------------------
 // Brief update prompt
 // ---------------------------------------------------------------------------
 
 export const UPDATE_BRIEF_PROMPT = `You are a conversation analyst maintaining a running brief.
-You have the current brief and new messages from the conversation.
-Update the brief to reflect what has changed.
+Update the brief below to reflect the new messages.
  
-Output exactly the same JSON shape as the current brief, updated to reflect the new messages. Rules:
-- Only update fields that have genuinely changed
-- Add new items to establishedContext if new decisions were made
-- Update activeTopic to reflect the latest focus
-- Add to avoid if the AI explained something new in detail
-- Refine userStyle only if new evidence changes it
+Output exactly the same JSON shape, updated. Rules:
+- Only update fields that genuinely changed
+- Add to establishedContext when new decisions or facts are confirmed
+- Update activeTopic to the latest focus
+- Add to avoid when the AI explained something new in depth
 - Increment messageCount by the number of new messages
 - Set lastUpdatedAt to current Unix timestamp in milliseconds
-- Output valid JSON only. No preamble. No explanation.
-- If nothing meaningful changed, return the current brief unchanged.`;
+- If nothing meaningful changed, return the current brief unchanged
+- Output valid JSON only. No preamble. No explanation.`;
 
 // ---------------------------------------------------------------------------
 // buildSystemPrompt
 // ---------------------------------------------------------------------------
 
 /**
- * Assembles the full system prompt for Lyra based on conversation state.
+ * Assembles the full Lyra system prompt for a given conversation state.
  *
- * The history argument should already be trimmed by trimHistory() in
- * rewriteEngine.ts before being passed here.
+ * Expects history to be pre-trimmed by trimHistory() in rewriteEngine.ts.
  *
- * STATE 1 — no brief: raw (trimmed) history appended.
- * STATE 2 — brief + messageCount < 20: brief + recent exchanges from trimmed history.
- * STATE 3 — brief + messageCount >= 20: brief only, no raw history.
+ * STATE 1 — no brief, messageCount < 20:
+ *   Appends last MAX_RAW_PAIRS_STATE1 message pairs.
  *
- * @param history      - already-trimmed history (from trimHistory)
- * @param site         - target AI platform
- * @param brief        - conversation brief if available
- * @param messageCount - total messages in the conversation (for tiered logic)
+ * STATE 2 — brief active, messageCount < BRIEF_ONLY_THRESHOLD:
+ *   Appends structured brief + last MAX_RAW_PAIRS_STATE2 pairs.
+ *
+ * STATE 3 — brief active, messageCount >= BRIEF_ONLY_THRESHOLD:
+ *   Appends structured brief only. No raw history.
+ *
+ * Fallback — no brief, messageCount >= BRIEF_ONLY_THRESHOLD:
+ *   Appends last MAX_RAW_PAIRS_STATE1 pairs only. Never full history.
  */
 export function buildSystemPrompt(
   history: Message[],
@@ -153,53 +172,45 @@ export function buildSystemPrompt(
   brief?: ConversationBrief,
   messageCount?: number
 ): string {
-  const SITE_LABELS: Record<string, string> = {
-    chatgpt: "ChatGPT",
-    claude: "Claude",
-    gemini: "Gemini",
-    vscode: "VS Code / IDE",
-    perplexity: "Perplexity",
-    grok: "Grok",
-    copilot: "Microsoft Copilot",
-    poe: "Poe",
-    huggingchat: "HuggingChat",
-  };
   const siteLabel = SITE_LABELS[site] ?? site;
-  const count = messageCount ?? brief?.messageCount ?? history.length;
 
-  // ── STATE 2 / 3: Brief active ──────────────────────────────────────────
+  // Use explicit messageCount when provided.
+  // Do NOT fall back to brief.messageCount alone — that reflects
+  // extraction time, not current conversation length.
+  const count = messageCount ?? history.length;
+  const isLong = count >= BRIEF_ONLY_THRESHOLD;
+
+  // ── STATE 2 / 3: Brief active ────────────────────────────────────────
   if (brief) {
     const contextList = brief.establishedContext.length > 0
       ? brief.establishedContext.map((c) => `- ${c}`).join("\n")
-      : "- (none yet)";
+      : "- (none confirmed yet)";
 
     const avoidList = brief.avoid.length > 0
       ? brief.avoid.join(", ")
-      : "(none)";
+      : "nothing specific";
 
-    const briefBlock =
-      `\n\nREMINDER: You are rewriting the prompt below into a better prompt. ` +
-      `You are not answering it. Use the brief for context only.\n\n` +
-      `CONVERSATION BRIEF:\n` +
-      `Goal: ${brief.goal}\n` +
-      `Active topic: ${brief.activeTopic}\n` +
-      `Established context:\n${contextList}\n` +
-      `User style: ${brief.userStyle}\n` +
-      `Do not re-explain: ${avoidList}`;
+    const briefBlock = [
+      `\n\nCONVERSATION BRIEF (use for context only — do not answer, rewrite the prompt):`,
+      `Goal: ${brief.goal}`,
+      `Active topic: ${brief.activeTopic}`,
+      `Established context:\n${contextList}`,
+      `User style: ${brief.userStyle}`,
+      `Already explained — do not repeat: ${avoidList}`,
+    ].join("\n");
 
-    // STATE 3: 20+ messages — brief only, no raw history
-    if (count >= 20) {
+    // STATE 3: Long conversation — brief only, no raw history
+    if (isLong) {
       return (
         LYRA_SYSTEM_PROMPT +
         briefBlock +
-        `\n\nThe conversation is long. Use only the brief above as context. ` +
-        `Do not ask for more information. ` +
-        `Tailor your optimization to ${siteLabel}.`
+        `\n\nTarget platform: ${siteLabel}.` +
+        `\nOptimize for continuity with this conversation. Do not request more information.`
       );
     }
 
-    // STATE 2: Brief + recent exchanges from trimmed history
-    const recent = history.map(truncateMessage);
+    // STATE 2: Brief + last 1 exchange for immediate continuity
+    const recent = getRecentPairs(history, MAX_RAW_PAIRS_STATE2);
     const recentBlock = recent.length > 0
       ? `\n\nMost recent exchange:\n${formatHistory(recent)}`
       : "";
@@ -208,33 +219,29 @@ export function buildSystemPrompt(
       LYRA_SYSTEM_PROMPT +
       briefBlock +
       recentBlock +
-      `\n\nTailor your optimization to ${siteLabel}. ` +
-      `Build directly on what is established. ` +
-      `Do not repeat what is in the avoid list.`
+      `\n\nTarget platform: ${siteLabel}.` +
+      `\nBuild on what is established. Do not repeat what is in the avoid list.`
     );
   }
 
-  // ── STATE 1 / Fallback: No brief ──────────────────────────────────────
+  // ── STATE 1 / Fallback: No brief ─────────────────────────────────────
 
-  const recent = history.map(truncateMessage);
+  const recent = getRecentPairs(history, MAX_RAW_PAIRS_STATE1);
 
   if (recent.length > 0) {
     return (
       LYRA_SYSTEM_PROMPT +
-      `\n\nYou have recent conversation history below. ` +
-      `The user is continuing this conversation. ` +
-      `Optimize their next prompt with awareness of what was recently discussed. ` +
-      `Do not re-explain things already covered. ` +
-      `Tailor your optimization to ${siteLabel}.\n\n` +
-      `Recent conversation:\n\n${formatHistory(recent)}`
+      `\n\nCONVERSATION HISTORY (use for context only — do not answer, rewrite the prompt):\n` +
+      `${formatHistory(recent)}` +
+      `\n\nTarget platform: ${siteLabel}.` +
+      `\nOptimize for continuity with what was just discussed.`
     );
   }
 
-  // Cold start — no history at all
+  // Cold start — no history, no brief
   return (
     LYRA_SYSTEM_PROMPT +
-    `\n\nREMINDER: Rewrite the prompt. Do not answer it.\n\n` +
-    `There is no prior conversation history. Optimize this prompt cold. ` +
-    `Tailor your optimization to ${siteLabel}.`
+    `\n\nTarget platform: ${siteLabel}.` +
+    `\nNo prior context. Optimize this prompt cold.`
   );
 }

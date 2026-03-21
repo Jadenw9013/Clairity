@@ -67,9 +67,10 @@ export async function callLyra(input: LyraInput): Promise<LyraOutput> {
   const system = buildSystemPrompt(trimmed, site, brief, messageCount);
 
   // Compose message list: trimmed history context + the user's current prompt
+  // Wrap prompt in XML tags so Claude unambiguously knows what text to optimize
   const messages: Message[] = [
     ...trimmed,
-    { role: "user", content: prompt },
+    { role: "user", content: `<prompt_to_optimize>${prompt}</prompt_to_optimize>` },
   ];
 
   const result = await callLlm({ system, messages }, apiKey);
