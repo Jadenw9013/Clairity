@@ -66,6 +66,19 @@ export async function callLyra(input: LyraInput): Promise<LyraOutput> {
 
   const system = buildSystemPrompt(trimmed, site, brief, messageCount);
 
+  // When no brief is available at 20+ messages, increase output token budget.
+  // The fallback path includes 8 history messages in the payload, leaving less
+  // room for output under the default 600-token cap.
+  const isLongFallback = !brief && messageCount >= 20;
+  const maxTokens = isLongFallback ? 800 : undefined;
+
+  if (isLongFallback) {
+    logger.warn(
+      { module: "rewriteEngine", historyLen: history.length, messageCount },
+      "No brief available at 20+ messages — using fallback history trim. Brief extraction may have failed."
+    );
+  }
+
   // Compose message list: trimmed history context + the user's current prompt
   // Wrap prompt in XML tags so Claude unambiguously knows what text to optimize
   const messages: Message[] = [
@@ -73,7 +86,7 @@ export async function callLyra(input: LyraInput): Promise<LyraOutput> {
     { role: "user", content: `<prompt_to_optimize>${prompt}</prompt_to_optimize>` },
   ];
 
-  const result = await callLlm({ system, messages }, apiKey);
+  const result = await callLlm({ system, messages, maxTokens }, apiKey);
 
   if (!result) {
     logger.info({ module: "rewriteEngine", historyLen: history.length, trimmedLen: trimmed.length, briefActive: !!brief }, "LLM unavailable — returning original prompt");

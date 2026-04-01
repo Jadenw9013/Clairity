@@ -206,5 +206,39 @@ describe("callLyra", () => {
     expect(llmArgs.messages).toHaveLength(5);
     expect(llmArgs.messages[4]).toMatchObject({ role: "user", content: "<prompt_to_optimize>another question</prompt_to_optimize>" });
   });
-});
 
+  // -----------------------------------------------------------------------
+  // maxTokens override for 20+ fallback
+  // -----------------------------------------------------------------------
+
+  it("passes maxTokens=800 when no brief and 20+ messages (fallback path)", async () => {
+    mockCallLlm.mockResolvedValue({ content: "Fallback enhanced", model: "claude-haiku-4-5-20251001" });
+
+    const history = generateHistory(12); // 24 messages, no brief
+    await callLyra({ prompt: "test", history, site: "chatgpt" });
+
+    const llmArgs = mockCallLlm.mock.calls[0]![0] as { maxTokens?: number };
+    expect(llmArgs.maxTokens).toBe(800);
+  });
+
+  it("does not override maxTokens when brief is active at 20+ messages", async () => {
+    mockCallLlm.mockResolvedValue({ content: "Brief optimized", model: "claude-haiku-4-5-20251001" });
+
+    const history = generateHistory(12); // 24 messages
+    const brief = { ...sampleBrief, messageCount: 24 };
+    await callLyra({ prompt: "test", history, site: "chatgpt", brief });
+
+    const llmArgs = mockCallLlm.mock.calls[0]![0] as { maxTokens?: number };
+    expect(llmArgs.maxTokens).toBeUndefined();
+  });
+
+  it("does not override maxTokens for short conversations without brief", async () => {
+    mockCallLlm.mockResolvedValue({ content: "Short enhanced", model: "claude-haiku-4-5-20251001" });
+
+    const history = generateHistory(4); // 8 messages, no brief
+    await callLyra({ prompt: "test", history, site: "chatgpt" });
+
+    const llmArgs = mockCallLlm.mock.calls[0]![0] as { maxTokens?: number };
+    expect(llmArgs.maxTokens).toBeUndefined();
+  });
+});

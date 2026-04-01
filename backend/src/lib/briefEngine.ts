@@ -9,6 +9,12 @@ import { logger } from "./logger.js";
 
 const BRIEF_MAX_TOKENS = 300;
 
+/** Max messages to include when extracting a brief — prevents token overflow */
+const MAX_BRIEF_HISTORY_MESSAGES = 20;
+
+/** Max chars per message in brief extraction — keeps payload compact */
+const MAX_BRIEF_MSG_CHARS = 500;
+
 /**
  * Parse raw LLM JSON output into a ConversationBrief.
  * Returns null if the shape is invalid or JSON is malformed.
@@ -51,12 +57,28 @@ function parseBriefJson(raw: string, messageCount: number): ConversationBrief | 
 }
 
 /**
+ * Prepare history for brief extraction: cap message count and truncate content.
+ * Uses the most recent messages (they carry the most relevant context).
+ */
+export function prepareBriefHistory(history: Message[]): Message[] {
+  const capped = history.slice(-MAX_BRIEF_HISTORY_MESSAGES);
+  return capped.map((m) => ({
+    ...m,
+    content: m.content.length > MAX_BRIEF_MSG_CHARS
+      ? m.content.slice(0, MAX_BRIEF_MSG_CHARS) + "… [truncated]"
+      : m.content,
+  }));
+}
+
+/**
  * Extract an initial ConversationBrief from raw conversation history.
  * Called once after messageCount >= 6.
  * Returns null on any LLM failure — caller keeps using raw history.
  */
 export async function extractBrief(history: Message[], apiKey?: string): Promise<ConversationBrief | null> {
-  const formattedHistory = history
+  const prepared = prepareBriefHistory(history);
+
+  const formattedHistory = prepared
     .map((m) => `${m.role === "user" ? "USER" : "ASSISTANT"}: ${m.content}`)
     .join("\n\n");
 

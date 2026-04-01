@@ -10,7 +10,7 @@ vi.mock("../src/lib/llmClient.js", () => ({
   callLlm: mockCallLlm,
 }));
 
-import { extractBrief, updateBrief } from "../src/lib/briefEngine.js";
+import { extractBrief, updateBrief, prepareBriefHistory } from "../src/lib/briefEngine.js";
 import { buildSystemPrompt } from "../src/lib/llmPrompts.js";
 
 // ---------------------------------------------------------------------------
@@ -92,6 +92,83 @@ describe("extractBrief", () => {
 
     expect(brief).not.toBeNull();
     expect(brief!.goal).toBeTruthy();
+  });
+
+  it("truncates history to last 20 messages before sending to LLM", async () => {
+    // Generate 30 messages (15 pairs) — should be capped to last 20
+    const longHistory: Array<{ role: "user" | "assistant"; content: string }> = [];
+    for (let i = 0; i < 15; i++) {
+      longHistory.push({ role: "user", content: `user message ${i + 1}` });
+      longHistory.push({ role: "assistant", content: `assistant message ${i + 1}` });
+    }
+
+    mockCallLlm.mockResolvedValueOnce({ content: validBriefJson, model: "claude-haiku" });
+
+    await extractBrief(longHistory);
+
+    // Verify the LLM was called with truncated content
+    const llmArgs = mockCallLlm.mock.calls[0]![0] as { messages: Array<{ content: string }> };
+    const userContent = llmArgs.messages[0]!.content;
+
+    // Should NOT contain the first 10 messages (indices 0-9)
+    expect(userContent).not.toContain("user message 1\n");
+    // Should contain the last 20 messages (indices 10-29)
+    expect(userContent).toContain("user message 11");
+    expect(userContent).toContain("assistant message 15");
+  });
+
+  it("truncates individual long messages in brief extraction", async () => {
+    const longMessage = "x".repeat(1000);
+    const history = [
+      { role: "user" as const, content: longMessage },
+      { role: "assistant" as const, content: "short reply" },
+    ];
+
+    mockCallLlm.mockResolvedValueOnce({ content: validBriefJson, model: "claude-haiku" });
+
+    await extractBrief(history);
+
+    const llmArgs = mockCallLlm.mock.calls[0]![0] as { messages: Array<{ content: string }> };
+    const userContent = llmArgs.messages[0]!.content;
+
+    // 500 chars + "… [truncated]" = 514 chars max per message, not the full 1000
+    expect(userContent).not.toContain("x".repeat(600));
+    expect(userContent).toContain("[truncated]");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// prepareBriefHistory tests
+// ---------------------------------------------------------------------------
+describe("prepareBriefHistory", () => {
+  it("returns all messages when under cap", () => {
+    const result = prepareBriefHistory(sampleHistory);
+    expect(result).toHaveLength(sampleHistory.length);
+  });
+
+  it("caps at 20 messages using the most recent", () => {
+    const longHistory: Array<{ role: "user" | "assistant"; content: string }> = [];
+    for (let i = 0; i < 15; i++) {
+      longHistory.push({ role: "user", content: `user ${i + 1}` });
+      longHistory.push({ role: "assistant", content: `assistant ${i + 1}` });
+    }
+    // 30 messages → should cap to last 20
+    const result = prepareBriefHistory(longHistory);
+    expect(result).toHaveLength(20);
+    // First message should be user message 6 (index 10 of the original 30)
+    expect(result[0]!.content).toBe("user 6");
+  });
+
+  it("truncates individual messages exceeding 500 chars", () => {
+    const history = [
+      { role: "user" as const, content: "a".repeat(600) },
+      { role: "assistant" as const, content: "short" },
+    ];
+    const result = prepareBriefHistory(history);
+    expect(result[0]!.content.length).toBeLessThan(600);
+    expect(result[0]!.content).toContain("[truncated]");
+    // Short message unchanged
+    expect(result[1]!.content).toBe("short");
   });
 });
 
