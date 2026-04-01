@@ -3,12 +3,7 @@
 // Clears automatically when the browser closes — intentional, no cross-session persistence.
 // Cap: 20 message pairs per conversationId; oldest pair dropped when exceeded.
 
-import type { ConversationBrief } from "shared/types/index.ts";
-
-export interface Message {
-  role: "user" | "assistant";
-  content: string;
-}
+import type { ConversationBrief, Message } from "shared/types/index.ts";
 
 const MAX_PAIRS = 20;
 const STORAGE_KEY = "clairity_conversations";
