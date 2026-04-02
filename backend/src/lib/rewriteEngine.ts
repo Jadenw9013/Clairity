@@ -93,5 +93,21 @@ export async function callLyra(input: LyraInput): Promise<LyraOutput> {
     return { enhanced_prompt: prompt, model: "fallback" };
   }
 
+  // Answer-mode detection heuristic: if the output is significantly longer
+  // than a short input, the model may have answered the prompt instead of
+  // rewriting it. Log for monitoring — do not reject or alter the output.
+  if (prompt.length < 200 && result.content.length > prompt.length * 2.5) {
+    logger.warn(
+      {
+        module: "rewriteEngine",
+        inputLen: prompt.length,
+        outputLen: result.content.length,
+        ratio: +(result.content.length / prompt.length).toFixed(1),
+        briefActive: !!brief,
+      },
+      "Possible answer-mode output detected — result significantly longer than short input"
+    );
+  }
+
   return { enhanced_prompt: result.content, model: result.model };
 }

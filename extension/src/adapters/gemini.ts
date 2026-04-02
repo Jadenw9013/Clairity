@@ -93,6 +93,69 @@ function getConversationHistoryFromDOM(): Message[] {
   return [];
 }
 
+// ---------------------------------------------------------------------------
+// Injection strategies — one per host environment
+// ---------------------------------------------------------------------------
+
+/**
+ * gemini.google.com: full Gemini app with toolbox-drawer, leading/trailing
+ * action wrappers. Inject after the Tools button (toolbox-drawer).
+ */
+function getGeminiDirectAnchor(adapter: { getPromptElement(): HTMLElement | null }): HTMLElement | null {
+  // Primary: toolbox-drawer (Tools button) → afterend injection
+  const toolboxDrawer = document.querySelector<HTMLElement>("toolbox-drawer");
+  if (toolboxDrawer) return toolboxDrawer;
+
+  // Fallback 1: upload (+) button container
+  const uploaderContainer = document.querySelector<HTMLElement>(
+    ".uploader-button-container"
+  );
+  if (uploaderContainer) return uploaderContainer;
+
+  // Fallback 2: leading-actions-wrapper row → prepend
+  const leadingActions = document.querySelector<HTMLElement>(
+    ".leading-actions-wrapper"
+  );
+  if (leadingActions) {
+    leadingActions.setAttribute("data-clairity-inject", "prepend");
+    return leadingActions;
+  }
+
+  // Fallback 3: rich-textarea or input
+  const input = adapter.getPromptElement();
+  const richTextarea = input?.closest("rich-textarea") as HTMLElement | null;
+  return richTextarea ?? input ?? null;
+}
+
+/**
+ * google.com AI Mode (search?udm=50): simpler toolbar with just + and mic.
+ * No toolbox-drawer or leading/trailing wrappers exist here.
+ * Inject after the + button ("More input options").
+ */
+function getGoogleAIModeAnchor(adapter: { getPromptElement(): HTMLElement | null }): HTMLElement | null {
+  // Primary: find the + button by aria-label → afterend injection
+  const plusBtn = document.querySelector<HTMLElement>(
+    'button[aria-label="More input options"]'
+  );
+  if (plusBtn) return plusBtn;
+
+  // Fallback 1: find any button in the toolbar row that's not Submit/Mic
+  const textarea = adapter.getPromptElement();
+  if (textarea) {
+    const form = textarea.closest("form");
+    const container = form ?? textarea.parentElement?.parentElement;
+    if (container) {
+      const firstBtn = container.querySelector<HTMLElement>(
+        'button:not([aria-label*="Submit" i]):not([aria-label*="Microphone" i])'
+      );
+      if (firstBtn) return firstBtn;
+    }
+  }
+
+  // Fallback 2: textarea parent (absolute fallback)
+  return textarea?.parentElement ?? textarea ?? null;
+}
+
 export const geminiAdapter: SiteAdapter = {
   id: "gemini",
   name: "Gemini",
@@ -136,28 +199,21 @@ export const geminiAdapter: SiteAdapter = {
   },
 
   getButtonAnchor(): HTMLElement | null {
-    const input = this.getPromptElement();
-    if (!input) return null;
+    const hostname = window.location.hostname;
 
-    // Primary: find the trailing-actions div which is a SIBLING of rich-textarea
-    // (not a child), containing the Fast dropdown and mic button.
-    const richTextarea = input.closest("rich-textarea") as HTMLElement;
-    const parent = richTextarea?.parentElement;
-    if (parent) {
-      const trailingActions =
-        parent.querySelector<HTMLElement>('[class*="trailing-actions"]') ??
-        parent.querySelector<HTMLElement>('[class*="trailing"]') ??
-        parent.querySelector<HTMLElement>('div:has(button[aria-label*="Fast" i])') ??
-        parent.querySelector<HTMLElement>('div:has(button[aria-label*="model" i])');
-      if (trailingActions && trailingActions !== parent) {
-        trailingActions.setAttribute("data-clairity-inject", "prepend");
-        return trailingActions;
-      }
+    // ── gemini.google.com — full Gemini app with toolbar ──────────────
+    if (hostname === "gemini.google.com") {
+      return getGeminiDirectAnchor(this);
     }
 
-    // Fallback: return rich-textarea or input
-    if (richTextarea) return richTextarea;
-    return input;
+    // ── google.com AI Mode (search?udm=50) — simpler toolbar ─────────
+    if (hostname === "www.google.com" || hostname === "google.com") {
+      return getGoogleAIModeAnchor(this);
+    }
+
+    // Unknown host matched by detect() — generic fallback
+    const input = this.getPromptElement();
+    return input?.parentElement ?? input ?? null;
   },
 
   getConversationHistory(): Message[] {

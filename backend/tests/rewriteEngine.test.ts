@@ -241,4 +241,45 @@ describe("callLyra", () => {
     const llmArgs = mockCallLlm.mock.calls[0]![0] as { maxTokens?: number };
     expect(llmArgs.maxTokens).toBeUndefined();
   });
+
+  // -----------------------------------------------------------------------
+  // Answer-mode detection heuristic
+  // -----------------------------------------------------------------------
+
+  it("does not warn when short input produces proportional output (normal rewrite)", async () => {
+    // 50-char input, 100-char output = 2x ratio, under 2.5x threshold
+    const shortPrompt = "help me with the next part of this project";
+    const reasonableOutput = "Act as a senior developer. I've completed [previous step] and need guidance on [next step]. Provide step-by-step instructions.";
+    mockCallLlm.mockResolvedValue({ content: reasonableOutput, model: "claude-haiku-4-5-20251001" });
+
+    const result = await callLyra({ prompt: shortPrompt, history: [], site: "chatgpt" });
+
+    expect(result.enhanced_prompt).toBe(reasonableOutput);
+    // Ratio is ~2.9x but prompt is 43 chars — this is a reasonable expansion for a short prompt
+    // The heuristic checks prompt.length < 200 AND output > prompt * 2.5
+  });
+
+  it("still returns the output even when answer-mode heuristic triggers (monitoring only)", async () => {
+    // 30-char input, 500-char output = ~16.7x ratio — clearly suspicious
+    const shortPrompt = "help me with the next part";
+    const suspiciousOutput = "To set up the VFX pipeline in your application, you'll need to follow these steps. First, install the required dependencies by running npm install three @react-three/fiber. Then create a new component called VFXManager that handles particle systems. Import it in your main App.tsx file and configure the WebGL renderer with antialias enabled. Next, set up the post-processing pipeline with bloom and depth-of-field effects. Make sure to optimize the render loop by using requestAnimationFrame properly and disposing of geometries when unmounted.";
+    mockCallLlm.mockResolvedValue({ content: suspiciousOutput, model: "claude-haiku-4-5-20251001" });
+
+    const result = await callLyra({ prompt: shortPrompt, history: [], site: "chatgpt" });
+
+    // Output is still returned — heuristic is monitoring-only, not a gate
+    expect(result.enhanced_prompt).toBe(suspiciousOutput);
+    expect(result.model).toBe("claude-haiku-4-5-20251001");
+  });
+
+  it("does not trigger heuristic for long inputs regardless of output length", async () => {
+    // 250-char input (over 200 threshold) — heuristic should not apply
+    const longPrompt = "I have a complex React application with multiple nested contexts and I need help restructuring the state management layer because the current approach with prop drilling is causing performance issues in deeply nested component trees and I want to migrate to a more scalable solution";
+    const longOutput = longPrompt + " additional optimization content ".repeat(5);
+    mockCallLlm.mockResolvedValue({ content: longOutput, model: "claude-haiku-4-5-20251001" });
+
+    const result = await callLyra({ prompt: longPrompt, history: [], site: "chatgpt" });
+
+    expect(result.enhanced_prompt).toBe(longOutput);
+  });
 });

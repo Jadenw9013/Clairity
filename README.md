@@ -41,10 +41,6 @@ No `.env` setup required. The backend runs on a hosted server. Just build, load,
 
 ---
 
-Production-grade Chrome extension that rewrites prompts into optimized
-structured prompts for better LLM outputs.
-
-
 ## Architecture
 
 ```
@@ -57,25 +53,11 @@ structured prompts for better LLM outputs.
 Users provide their own Anthropic API key via the extension popup.
 Keys are stored in `chrome.storage.local` and passed via `x-api-key` header.
 
-## Quick Start
-
-### Prerequisites
-
-- Node.js >= 20
-- npm >= 10
-- Chrome (for extension loading)
-
-### Install
-
-```bash
-git clone <repo-url> && cd Clairity
-npm install
-```
+## Development
 
 ### Run Backend (dev)
 
 ```bash
-cp backend/.env.example backend/.env    # Add your LLM_API_KEY
 npm run dev --workspace=backend
 ```
 
@@ -116,10 +98,42 @@ shared/      Shared types and utilities
 | Poe | `poe.ts` | contenteditable |
 | HuggingChat | `huggingchat.ts` | textarea |
 
+## Changelog
+
+### v1.1 — Multi-Platform UI & Engine Hardening
+
+**Rewrite Engine**
+- Hardened system prompts with explicit negative rules to prevent the LLM from answering prompts instead of optimizing them
+- Capped conversation history to 20 messages / 500 chars per message to prevent token overflow and 3s timeouts
+- Increased timeout to 8s and retries to 2 for improved reliability
+
+**Gemini & Google AI Mode**
+- Refactored `gemini.ts` with hostname-based injection strategies for `gemini.google.com` vs Google AI Mode (`udm=50`)
+- Fixed button overlap on Google AI Mode by targeting the `+` button with `afterend` injection
+
+**Microsoft Copilot & M365 Copilot**
+- Refactored `copilot.ts` with environment-specific strategies for `copilot.microsoft.com` vs `m365.cloud.microsoft`
+- Copilot: uses Smart dropdown as landmark → targets voice button wrapper for right-side inline placement
+- M365: structural anchor detection finds right-most toolbar button for `beforebegin` injection
+- Added `beforebegin` as a new injection mode in the enhance button system
+
+**Extension Icons**
+- Replaced placeholder icons with branded indigo gradient + ✦ sparkle at 16/32/48/128px
+
+**Code Quality**
+- Removed dead code and debug `console.log` statements
+- Cleaned up malformed `.env.example`
+
+### v1.0 — Initial Release
+
+- Lyra prompt optimization framework with conversation briefing
+- 8 site adapters covering 10 AI platforms
+- Chrome extension with popup API key management
+- Backend API with rate limiting, validation, and structured logging
+
 ## Constraints
 
 - TypeScript strict mode everywhere
-- No `.md` file exceeds 150 lines
 - Minimal Chrome permissions (no `<all_urls>`)
 - Versioned API routes (`/v1/`)
 - Structured logging, input validation, rate limiting

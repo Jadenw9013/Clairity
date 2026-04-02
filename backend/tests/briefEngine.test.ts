@@ -271,4 +271,25 @@ describe("buildSystemPrompt", () => {
     expect(system).not.toContain("Most recent exchange:");
     expect(system).toContain("Optimize for continuity");
   });
+
+  it("contains explicit negative instructions forbidding answer-mode output", () => {
+    // Test with brief active (the scenario most prone to answer-mode)
+    const system = buildSystemPrompt(sampleHistory, "chatgpt", sampleBrief, 10);
+
+    // Must contain hard negative rules
+    expect(system).toContain("NEVER answer the question");
+    expect(system).toContain("NEVER include domain knowledge");
+    expect(system).toContain("something a human would type INTO a chat box");
+
+    // Must contain the continuation prompt example
+    expect(system).toContain("can you help me with the next part");
+    expect(system).toContain("BETTER PROMPT, not an answer");
+  });
+
+  it("contains negative instructions even without brief (cold start)", () => {
+    const system = buildSystemPrompt([], "chatgpt");
+
+    expect(system).toContain("NEVER answer the question");
+    expect(system).toContain("HARD NEGATIVE RULES");
+  });
 });

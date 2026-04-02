@@ -376,12 +376,16 @@ export function injectEnhanceButton(
 
   // Smart injection: supports three strategies
   // 1. Adapter explicitly wants prepend (toolbar container) via data attribute
-  // 2. Grammarly-adjacent: insert left of Grammarly icon
-  // 3. Default: insert after anchor element
+  // 2. Adapter explicitly wants beforebegin (insert before anchor, e.g. left of mic)
+  // 3. Grammarly-adjacent: insert left of Grammarly icon
+  // 4. Default: insert after anchor element
   const injectMode = anchor.getAttribute("data-clairity-inject");
   if (injectMode === "prepend") {
     anchor.removeAttribute("data-clairity-inject");
     anchor.insertBefore(host, anchor.firstChild);
+  } else if (injectMode === "beforebegin") {
+    anchor.removeAttribute("data-clairity-inject");
+    anchor.insertAdjacentElement("beforebegin", host);
   } else {
     const searchContainer = anchor.parentElement ?? anchor;
     const grammarlyEl = searchContainer.querySelector(
