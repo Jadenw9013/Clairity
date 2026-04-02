@@ -5,6 +5,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { validate } from "../../middleware/validate.js";
 import { callLyra } from "../../lib/rewriteEngine.js";
+import { validateApiKey } from "../../middleware/validateApiKey.js";
 
 const messageSchema = z.object({
   role: z.enum(["user", "assistant"]),
@@ -30,18 +31,23 @@ const rewriteSchema = z.object({
 
 const router = Router();
 
-router.post("/rewrite", validate(rewriteSchema), async (req, res) => {
-  const { prompt, history, site, brief } = req.body as z.infer<typeof rewriteSchema>;
-  const userApiKey = req.headers["x-api-key"] as string | undefined;
+router.post("/rewrite", validate(rewriteSchema), async (req, res, next) => {
+  try {
+    const { prompt, history, site, brief } = req.body as z.infer<typeof rewriteSchema>;
+    const userApiKey = validateApiKey(req, res);
+    if (userApiKey === false) return; // 400 already sent
 
-  const result = await callLyra({ prompt, history, site, brief, apiKey: userApiKey });
+    const result = await callLyra({ prompt, history, site, brief, apiKey: userApiKey ?? undefined });
 
-  res.json({
-    enhanced_prompt: result.enhanced_prompt,
-    history_length: history.length,
-    model: result.model,
-    brief_active: !!brief,
-  });
+    res.json({
+      enhanced_prompt: result.enhanced_prompt,
+      history_length: history.length,
+      model: result.model,
+      brief_active: !!brief,
+    });
+  } catch (err) {
+    next(err);
+  }
 });
 
 export default router;

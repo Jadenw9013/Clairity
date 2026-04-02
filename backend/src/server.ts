@@ -91,6 +91,17 @@ function corsOriginCallback(
   callback(null, false);
 }
 
+/** Strip sensitive headers from pino-http request logs */
+function redactHeaders(
+  headers: Record<string, string | string[] | undefined> | undefined
+): Record<string, string | string[] | undefined> | undefined {
+  if (!headers) return headers;
+  const safe = { ...headers };
+  if (safe["authorization"]) safe["authorization"] = "[REDACTED]";
+  if (safe["x-api-key"]) safe["x-api-key"] = "[REDACTED]";
+  return safe;
+}
+
 export const app = express();
 
 // Trust proxy for rate limiter IP extraction behind reverse proxy
@@ -103,6 +114,20 @@ app.use(
   pinoHttp({
     logger,
     autoLogging: { ignore: (req) => req.url === "/v1/health" },
+    serializers: {
+      req(raw) {
+        return {
+          id: raw.id,
+          method: raw.method,
+          url: raw.url,
+          query: raw.query,
+          params: raw.params,
+          headers: redactHeaders(raw.headers),
+          remoteAddress: raw.remoteAddress,
+          remotePort: raw.remotePort,
+        };
+      },
+    },
   })
 );
 

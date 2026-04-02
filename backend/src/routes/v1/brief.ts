@@ -6,6 +6,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { validate } from "../../middleware/validate.js";
+import { validateApiKey } from "../../middleware/validateApiKey.js";
 import { extractBrief, updateBrief } from "../../lib/briefEngine.js";
 
 const router = Router();
@@ -35,19 +36,31 @@ const updateSchema = z.object({
 });
 
 // POST /v1/brief/extract
-router.post("/brief/extract", validate(extractSchema), async (req, res) => {
-  const { history } = req.body as z.infer<typeof extractSchema>;
-  const userApiKey = req.headers["x-api-key"] as string | undefined;
-  const brief = await extractBrief(history, userApiKey);
-  res.json({ brief });
+router.post("/brief/extract", validate(extractSchema), async (req, res, next) => {
+  try {
+    const { history } = req.body as z.infer<typeof extractSchema>;
+    const userApiKey = validateApiKey(req, res);
+    if (userApiKey === false) return;
+
+    const brief = await extractBrief(history, userApiKey ?? undefined);
+    res.json({ brief });
+  } catch (err) {
+    next(err);
+  }
 });
 
 // POST /v1/brief/update
-router.post("/brief/update", validate(updateSchema), async (req, res) => {
-  const { currentBrief, newMessages } = req.body as z.infer<typeof updateSchema>;
-  const userApiKey = req.headers["x-api-key"] as string | undefined;
-  const brief = await updateBrief(currentBrief, newMessages, userApiKey);
-  res.json({ brief });
+router.post("/brief/update", validate(updateSchema), async (req, res, next) => {
+  try {
+    const { currentBrief, newMessages } = req.body as z.infer<typeof updateSchema>;
+    const userApiKey = validateApiKey(req, res);
+    if (userApiKey === false) return;
+
+    const brief = await updateBrief(currentBrief, newMessages, userApiKey ?? undefined);
+    res.json({ brief });
+  } catch (err) {
+    next(err);
+  }
 });
 
 export default router;

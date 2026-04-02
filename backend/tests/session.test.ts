@@ -76,18 +76,58 @@ describe("Auth middleware", () => {
 });
 
 describe("Token verification", () => {
-  it("rejects expired tokens", async () => {
-    // Manually create a token with past expiry by manipulating env temporarily
-    // Instead, we test via the server by checking a tampered token
+  it("rejects tampered signature", async () => {
     const sessionRes = await request(app).post("/v1/session");
     const token = sessionRes.body.token as string;
-    // Tamper with the payload portion
     const tamperedToken = token.slice(0, -4) + "XXXX";
 
     const res = await request(app)
       .post("/v1/rewrite")
       .set("Authorization", `Bearer ${tamperedToken}`)
-      .send({ prompt: "test", context: { site: "chatgpt" } });
+      .send({ prompt: "test", site: "chatgpt", history: [] });
+    expect(res.status).toBe(401);
+  });
+
+  it("rejects actually expired tokens", async () => {
+    // Create a token, then advance time past expiry
+    const sessionRes = await request(app).post("/v1/session");
+    const token = sessionRes.body.token as string;
+
+    // Decode the payload, manually set exp to the past, re-sign
+    // We can't re-sign without the secret, so instead we test via verifyToken directly
+    const { verifyToken, createToken } = await import("../src/lib/token.js");
+
+    // Create token then mock Date.now to be past expiry
+    const originalNow = Date.now;
+    Date.now = () => originalNow() + 4_000_000; // 4000s > 3600s TTL
+
+    const result = verifyToken(token);
+    expect(result).toBeNull();
+
+    Date.now = originalNow; // restore
+  });
+
+  it("rejects empty token string", async () => {
+    const res = await request(app)
+      .post("/v1/rewrite")
+      .set("Authorization", "Bearer ")
+      .send({ prompt: "test", site: "chatgpt", history: [] });
+    expect(res.status).toBe(401);
+  });
+
+  it("rejects token with too many parts", async () => {
+    const res = await request(app)
+      .post("/v1/rewrite")
+      .set("Authorization", "Bearer a.b.c")
+      .send({ prompt: "test", site: "chatgpt", history: [] });
+    expect(res.status).toBe(401);
+  });
+
+  it("rejects token with no separator", async () => {
+    const res = await request(app)
+      .post("/v1/rewrite")
+      .set("Authorization", "Bearer noseparatortoken")
+      .send({ prompt: "test", site: "chatgpt", history: [] });
     expect(res.status).toBe(401);
   });
 });

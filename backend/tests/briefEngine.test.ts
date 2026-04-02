@@ -135,6 +135,87 @@ describe("extractBrief", () => {
     expect(userContent).not.toContain("x".repeat(600));
     expect(userContent).toContain("[truncated]");
   });
+
+  // --- parseBriefJson edge cases (tested via extractBrief) ---
+
+  it("returns null when LLM returns truncated/incomplete JSON", async () => {
+    mockCallLlm.mockResolvedValueOnce({
+      content: '{"goal": "Build app", "establishedContext": ["us',
+      model: "claude-haiku",
+    });
+    const brief = await extractBrief(sampleHistory);
+    expect(brief).toBeNull();
+  });
+
+  it("handles JSON with missing optional fields gracefully", async () => {
+    // Only goal provided — other fields should default
+    mockCallLlm.mockResolvedValueOnce({
+      content: '{"goal": "Build an app"}',
+      model: "claude-haiku",
+    });
+    const brief = await extractBrief(sampleHistory);
+    expect(brief).not.toBeNull();
+    expect(brief!.goal).toBe("Build an app");
+    expect(brief!.establishedContext).toEqual([]);
+    expect(brief!.avoid).toEqual([]);
+    expect(brief!.userStyle).toBe("");
+    expect(brief!.activeTopic).toBe("");
+  });
+
+  it("ignores extra unexpected fields in JSON output", async () => {
+    mockCallLlm.mockResolvedValueOnce({
+      content: JSON.stringify({
+        goal: "Test",
+        establishedContext: [],
+        userStyle: "Concise",
+        activeTopic: "Testing",
+        avoid: [],
+        extraField: "should be ignored",
+        anotherOne: 42,
+      }),
+      model: "claude-haiku",
+    });
+    const brief = await extractBrief(sampleHistory);
+    expect(brief).not.toBeNull();
+    expect(brief!.goal).toBe("Test");
+    expect(brief).not.toHaveProperty("extraField");
+  });
+
+  it("filters non-string elements from arrays", async () => {
+    mockCallLlm.mockResolvedValueOnce({
+      content: JSON.stringify({
+        goal: "Test",
+        establishedContext: ["valid", 42, null, "also valid"],
+        avoid: [true, "skip this"],
+      }),
+      model: "claude-haiku",
+    });
+    const brief = await extractBrief(sampleHistory);
+    expect(brief).not.toBeNull();
+    expect(brief!.establishedContext).toEqual(["valid", "also valid"]);
+    expect(brief!.avoid).toEqual(["skip this"]);
+  });
+
+  it("caps establishedContext and avoid arrays to 5 items", async () => {
+    mockCallLlm.mockResolvedValueOnce({
+      content: JSON.stringify({
+        goal: "Test",
+        establishedContext: ["a", "b", "c", "d", "e", "f", "g"],
+        avoid: ["1", "2", "3", "4", "5", "6"],
+      }),
+      model: "claude-haiku",
+    });
+    const brief = await extractBrief(sampleHistory);
+    expect(brief).not.toBeNull();
+    expect(brief!.establishedContext).toHaveLength(5);
+    expect(brief!.avoid).toHaveLength(5);
+  });
+
+  it("returns null for completely empty LLM output", async () => {
+    mockCallLlm.mockResolvedValueOnce({ content: "", model: "claude-haiku" });
+    const brief = await extractBrief(sampleHistory);
+    expect(brief).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
