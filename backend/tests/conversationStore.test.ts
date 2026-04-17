@@ -8,7 +8,17 @@ const mockStorage: Record<string, unknown> = {};
 const chromeMock = {
   storage: {
     session: {
-      get: vi.fn(async (key: string) => ({ [key]: mockStorage[key] })),
+      get: vi.fn(async (keys?: string | string[]) => {
+        if (typeof keys === "string") {
+          return { [keys]: mockStorage[keys] };
+        }
+        if (Array.isArray(keys)) {
+          const res: Record<string, unknown> = {};
+          keys.forEach((k) => { res[k] = mockStorage[k]; });
+          return res;
+        }
+        return mockStorage;
+      }),
       set: vi.fn(async (data: Record<string, unknown>) => {
         Object.assign(mockStorage, data);
       }),

@@ -101,15 +101,27 @@ export async function setBrief(conversationId: string, brief: ConversationBrief)
 // State decision helpers
 // ---------------------------------------------------------------------------
 
+/** Batched read of history and brief to minimize IPC latency. */
+export async function getHistoryAndBrief(
+  conversationId: string
+): Promise<{ history: Message[]; brief: ConversationBrief | null }> {
+  const result = await chrome.storage.session.get([STORAGE_KEY, BRIEF_STORAGE_KEY]);
+  const conversations = (result[STORAGE_KEY] as ConversationMemory) ?? {};
+  const briefs = (result[BRIEF_STORAGE_KEY] as BriefMemory) ?? {};
+  return {
+    history: conversations[conversationId] ?? [],
+    brief: briefs[conversationId] ?? null,
+  };
+}
+
 /**
  * Returns true when the conversation has enough history for a brief
  * but none has been created yet.
  * STATE 1 → STATE 2 transition trigger.
  */
 export async function shouldExtractBrief(conversationId: string): Promise<boolean> {
-  const count = await getMessageCount(conversationId);
-  if (count < BRIEF_THRESHOLD) return false;
-  const brief = await getBrief(conversationId);
+  const { history, brief } = await getHistoryAndBrief(conversationId);
+  if (history.length < BRIEF_THRESHOLD) return false;
   return brief === null;
 }
 
@@ -118,9 +130,9 @@ export async function shouldExtractBrief(conversationId: string): Promise<boolea
  * STATE 2/3 update trigger.
  */
 export async function shouldUpdateBrief(conversationId: string): Promise<boolean> {
-  const brief = await getBrief(conversationId);
+  const { history, brief } = await getHistoryAndBrief(conversationId);
   if (!brief) return false;
-  const count = await getMessageCount(conversationId);
+  const count = history.length;
   const messagesSinceBriefCreation = count - brief.messageCount;
   return messagesSinceBriefCreation > 0 && messagesSinceBriefCreation % BRIEF_UPDATE_INTERVAL === 0;
 }
