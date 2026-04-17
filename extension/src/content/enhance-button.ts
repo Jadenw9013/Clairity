@@ -1,5 +1,9 @@
 import type { SiteAdapter, ConversationBrief } from "shared/types/index.ts";
-import type { RewriteResponse, ErrorResponse, Site } from "shared/types/index.ts";
+import type {
+  RewriteResponse,
+  ErrorResponse,
+  Site,
+} from "shared/types/index.ts";
 // @ts-ignore
 import tokensCss from "../styles/tokens.css?inline";
 // @ts-ignore
@@ -33,7 +37,7 @@ function showPreviewCard(
   historyLength: number,
   adapter: SiteAdapter,
   brief?: ConversationBrief,
-  originalPrompt?: string
+  originalPrompt?: string,
 ): void {
   dismissCard();
 
@@ -85,15 +89,21 @@ function showPreviewCard(
     briefPanel.hidden = true;
 
     const briefContent = [
-      brief.goal ? `<div class="cl-brief-section"><strong>Goal</strong><p>${brief.goal}</p></div>` : "",
-      brief.activeTopic ? `<div class="cl-brief-section"><strong>Topic</strong><p>${brief.activeTopic}</p></div>` : "",
+      brief.goal
+        ? `<div class="cl-brief-section"><strong>Goal</strong><p>${brief.goal}</p></div>`
+        : "",
+      brief.activeTopic
+        ? `<div class="cl-brief-section"><strong>Topic</strong><p>${brief.activeTopic}</p></div>`
+        : "",
       brief.establishedContext.length > 0
         ? `<div class="cl-brief-section"><strong>Context</strong><ul>${brief.establishedContext.map((c) => `<li>${c}</li>`).join("")}</ul></div>`
         : "",
       brief.avoid.length > 0
         ? `<div class="cl-brief-section"><strong>Not repeating</strong><ul>${brief.avoid.map((a) => `<li>${a}</li>`).join("")}</ul></div>`
         : "",
-    ].filter(Boolean).join("");
+    ]
+      .filter(Boolean)
+      .join("");
 
     briefPanel.innerHTML = briefContent;
 
@@ -116,16 +126,20 @@ function showPreviewCard(
     };
     chip.addEventListener("click", togglePanel);
     chip.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); togglePanel(); }
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        togglePanel();
+      }
     });
 
     root.appendChild(chip);
     root.appendChild(briefPanel);
   } else {
     chip.className = "cl-card-chip";
-    chip.textContent = historyLength === 0
-      ? "✦ first prompt"
-      : `✦ ${historyLength} messages used`;
+    chip.textContent =
+      historyLength === 0
+        ? "✦ first prompt"
+        : `✦ ${historyLength} messages used`;
     root.appendChild(chip);
   }
 
@@ -201,12 +215,15 @@ function showPreviewCard(
         useBtn.innerHTML = `<span class="cl-star">✦</span> AI took too long — click to inject`;
         queueHint.remove();
         // Re-bind to direct inject on next click
-        useBtn.addEventListener("click", () => {
-          doInject();
-          dismissCard();
-        }, { once: true });
+        useBtn.addEventListener(
+          "click",
+          () => {
+            doInject();
+            dismissCard();
+          },
+          { once: true },
+        );
       }, 60_000);
-
     } else {
       // Normal path — inject immediately
       doInject();
@@ -226,7 +243,9 @@ function showPreviewCard(
         copyBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2-2v1"/></svg> Copy`;
         copyBtn.classList.remove("is-copied");
       }, 2000);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   });
 
   actions.appendChild(useBtn);
@@ -284,12 +303,7 @@ function showErrorCard(message: string): void {
   setTimeout(dismissCard, 6_000);
 }
 
-export function injectEnhanceButton(
-  adapter: SiteAdapter,
-  anchor: HTMLElement
-): void {
-  if (document.getElementById(BUTTON_ID)) return;
-
+function createHostElement(): { host: HTMLElement; shadow: ShadowRoot } {
   const host = document.createElement("div");
   host.id = BUTTON_ID;
   host.style.cssText = "display:inline-flex;align-items:center;margin:0 4px;";
@@ -300,6 +314,13 @@ export function injectEnhanceButton(
   style.textContent = tokensCss + "\n" + panelCss;
   shadow.appendChild(style);
 
+  return { host, shadow };
+}
+
+function createTriggerButton(shadow: ShadowRoot): {
+  btn: HTMLButtonElement;
+  setLoading: (loading: boolean) => void;
+} {
   // White pill button matching the reference design
   const btn = document.createElement("button");
   btn.className = "cl-trigger-pill";
@@ -319,61 +340,78 @@ export function injectEnhanceButton(
     }
   };
 
-  btn.addEventListener("click", async () => {
-    const prompt = adapter.getPromptText().trim();
-    if (!prompt) return;
+  return { btn, setLoading };
+}
 
-    const conversationId = getConversationId();
+async function handleEnhanceClick(
+  adapter: SiteAdapter,
+  setLoading: (loading: boolean) => void,
+): Promise<void> {
+  const prompt = adapter.getPromptText().trim();
+  if (!prompt) return;
 
-    // Extract DOM history — most accurate source; dedup by trimmed content
-    const domHistory = adapter.getConversationHistory();
-    const seen = new Set<string>();
-    const history = domHistory.filter((m) => {
-      const key = `${m.role}:${m.content.trim()}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return m.content.trim().length > 0;
-    });
+  const conversationId = getConversationId();
 
-    setLoading(true);
-
-
-    try {
-      if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) {
-        showErrorCard("Extension context lost — please reload the page.");
-        return;
-      }
-
-      const response = await chrome.runtime.sendMessage({
-        type: "REWRITE_PROMPT",
-        payload: { prompt, site: adapter.id as Site, history, conversationId },
-      });
-
-      if (chrome.runtime.lastError) {
-        console.warn("[Clairity]", chrome.runtime.lastError.message);
-        showErrorCard("Extension error — try reloading the page.");
-        return;
-      }
-
-      if (!response) {
-        showErrorCard("No response from service worker — try reloading the extension.");
-      } else if (response.type === "REWRITE_RESULT") {
-        const data = response.payload as RewriteResponse & { briefActive: boolean; brief?: ConversationBrief };
-        showPreviewCard(data.enhanced_prompt, data.history_length, adapter, data.briefActive ? data.brief : undefined, prompt);
-      } else if (response.type === "REWRITE_ERROR") {
-        const data = response.payload as ErrorResponse;
-        showErrorCard(data.error || "Unknown error from backend");
-      } else {
-        showErrorCard("Unexpected response format");
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Unknown error";
-      showErrorCard(msg);
-    } finally {
-      setLoading(false);
-    }
+  // Extract DOM history — most accurate source; dedup by trimmed content
+  const domHistory = adapter.getConversationHistory();
+  const seen = new Set<string>();
+  const history = domHistory.filter((m) => {
+    const key = `${m.role}:${m.content.trim()}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return m.content.trim().length > 0;
   });
 
+  setLoading(true);
+
+  try {
+    if (typeof chrome === "undefined" || !chrome.runtime?.sendMessage) {
+      showErrorCard("Extension context lost — please reload the page.");
+      return;
+    }
+
+    const response = await chrome.runtime.sendMessage({
+      type: "REWRITE_PROMPT",
+      payload: { prompt, site: adapter.id as Site, history, conversationId },
+    });
+
+    if (chrome.runtime.lastError) {
+      console.warn("[Clairity]", chrome.runtime.lastError.message);
+      showErrorCard("Extension error — try reloading the page.");
+      return;
+    }
+
+    if (!response) {
+      showErrorCard(
+        "No response from service worker — try reloading the extension.",
+      );
+    } else if (response.type === "REWRITE_RESULT") {
+      const data = response.payload as RewriteResponse & {
+        briefActive: boolean;
+        brief?: ConversationBrief;
+      };
+      showPreviewCard(
+        data.enhanced_prompt,
+        data.history_length,
+        adapter,
+        data.briefActive ? data.brief : undefined,
+        prompt,
+      );
+    } else if (response.type === "REWRITE_ERROR") {
+      const data = response.payload as ErrorResponse;
+      showErrorCard(data.error || "Unknown error from backend");
+    } else {
+      showErrorCard("Unexpected response format");
+    }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    showErrorCard(msg);
+  } finally {
+    setLoading(false);
+  }
+}
+
+function insertHostElement(host: HTMLElement, anchor: HTMLElement): void {
   // Smart injection: supports three strategies
   // 1. Adapter explicitly wants prepend (toolbar container) via data attribute
   // 2. Adapter explicitly wants beforebegin (insert before anchor, e.g. left of mic)
@@ -389,7 +427,7 @@ export function injectEnhanceButton(
   } else {
     const searchContainer = anchor.parentElement ?? anchor;
     const grammarlyEl = searchContainer.querySelector(
-      'grammarly-extension, grammarly-desktop-integration, [data-grammarly-shadow-root], [id*="grammarly"]'
+      'grammarly-extension, grammarly-desktop-integration, [data-grammarly-shadow-root], [id*="grammarly"]',
     );
     if (grammarlyEl && grammarlyEl.parentElement) {
       grammarlyEl.parentElement.insertBefore(host, grammarlyEl);
@@ -397,4 +435,18 @@ export function injectEnhanceButton(
       anchor.insertAdjacentElement("afterend", host);
     }
   }
+}
+
+export function injectEnhanceButton(
+  adapter: SiteAdapter,
+  anchor: HTMLElement,
+): void {
+  if (document.getElementById(BUTTON_ID)) return;
+
+  const { host, shadow } = createHostElement();
+  const { btn, setLoading } = createTriggerButton(shadow);
+
+  btn.addEventListener("click", () => handleEnhanceClick(adapter, setLoading));
+
+  insertHostElement(host, anchor);
 }
