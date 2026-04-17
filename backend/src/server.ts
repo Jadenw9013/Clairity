@@ -51,7 +51,7 @@ function buildAllowedOrigins(): string[] {
   if (NODE_ENV === "production") {
     return [...new Set([...envOrigins, ...extensionOrigins])];
   }
-  // Dev: explicit origins + extension env origins (chrome-extension:// handled dynamically below)
+  // Dev: explicit origins + extension env origins
   return [...new Set([...envOrigins, ...DEV_WEB_ORIGINS, ...extensionOrigins])];
 }
 
@@ -73,13 +73,6 @@ function corsOriginCallback(
     if (NODE_ENV !== "production") {
       logger.debug({ origin, rule: "allowlist" }, "CORS allowed");
     }
-    callback(null, true);
-    return;
-  }
-
-  // In development: auto-allow ANY chrome-extension:// origin (handles ID churn)
-  if (NODE_ENV !== "production" && origin.startsWith("chrome-extension://")) {
-    logger.debug({ origin, rule: "dev-extension-wildcard" }, "CORS allowed (dev: any extension)");
     callback(null, true);
     return;
   }
