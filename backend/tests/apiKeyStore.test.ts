@@ -16,16 +16,16 @@ function validateApiKey(key: string): boolean {
 
 function maskApiKey(key: string): string {
   const suffix = key.slice(-4);
-  return `sk-ant-...${suffix}`;
+  return `${KEY_PREFIX}...${suffix}`;
 }
 
 describe("apiKeyStore — pure logic", () => {
   describe("validateApiKey", () => {
-    it("returns true for valid sk-ant- key", () => {
-      expect(validateApiKey("sk-ant-abc123")).toBe(true);
+    it(`returns true for valid ${KEY_PREFIX} key`, () => {
+      expect(validateApiKey(`${KEY_PREFIX}abc123`)).toBe(true);
     });
 
-    it("returns false for key not starting with sk-ant-", () => {
+    it(`returns false for key not starting with ${KEY_PREFIX}`, () => {
       expect(validateApiKey("sk-openai-abc")).toBe(false);
     });
 
@@ -38,18 +38,19 @@ describe("apiKeyStore — pure logic", () => {
     });
 
     it("trims whitespace before validation", () => {
-      expect(validateApiKey("  sk-ant-validkey  ")).toBe(true);
+      expect(validateApiKey(`  ${KEY_PREFIX}validkey  `)).toBe(true);
     });
   });
 
   describe("maskApiKey", () => {
     it("masks key showing only last 4 chars", () => {
-      expect(maskApiKey("sk-ant-api001-abcd")).toBe("sk-ant-...abcd");
+      expect(maskApiKey(`${KEY_PREFIX}api001-abcd`)).toBe(`${KEY_PREFIX}...abcd`);
     });
 
-    it("mask format is always sk-ant-...XXXX", () => {
-      const masked = maskApiKey("sk-ant-somekey-1234");
-      expect(masked).toMatch(/^sk-ant-\.\.\..{4}$/);
+    it(`mask format is always ${KEY_PREFIX}...XXXX`, () => {
+      const masked = maskApiKey(`${KEY_PREFIX}somekey-1234`);
+      const regex = new RegExp(`^${KEY_PREFIX}\\.\\.\\..{4}$`);
+      expect(masked).toMatch(regex);
     });
   });
 });
