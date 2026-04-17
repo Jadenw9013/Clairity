@@ -130,4 +130,22 @@ describe("Token verification", () => {
       .send({ prompt: "test", site: "chatgpt", history: [] });
     expect(res.status).toBe(401);
   });
+
+  it("returns null when payload is not valid JSON", async () => {
+    const { verifyToken } = await import("../src/lib/token.js");
+    const { createHmac } = await import("node:crypto");
+    const secret = process.env["SESSION_SECRET"]!;
+
+    // Create an invalid JSON string but encode it correctly
+    const invalidJson = "{ invalid_json: true ";
+    const encoded = Buffer.from(invalidJson).toString("base64url");
+
+    // Sign it properly so it passes signature verification
+    const sig = createHmac("sha256", secret).update(encoded).digest("base64url");
+
+    const token = `${encoded}.${sig}`;
+    const result = verifyToken(token);
+
+    expect(result).toBeNull();
+  });
 });
