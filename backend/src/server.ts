@@ -77,13 +77,6 @@ function corsOriginCallback(
     return;
   }
 
-  // In development: auto-allow ANY chrome-extension:// origin (handles ID churn)
-  if (NODE_ENV !== "production" && origin.startsWith("chrome-extension://")) {
-    logger.debug({ origin, rule: "dev-extension-wildcard" }, "CORS allowed (dev: any extension)");
-    callback(null, true);
-    return;
-  }
-
   // Rejected — log in dev, return clean rejection (no Error = no 500)
   if (NODE_ENV !== "production") {
     logger.debug({ origin }, "CORS rejected");
