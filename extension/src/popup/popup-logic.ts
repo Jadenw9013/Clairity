@@ -1,36 +1,12 @@
-import type {
-  RewritePreset,
-  PromptIntent,
-  RewriteTone,
-  OutputFormat,
-} from "shared/types/index.ts";
-
 export const MAX_PROMPT_LENGTH = 10000;
 
-/** Validate prompt length. Returns error string or null if valid. */
+/** Validate prompt length. Returns a user-facing error string, or null if valid. */
 export function validatePromptLength(prompt: string): string | null {
-  if (!prompt) return "Please enter a prompt.";
+  if (!prompt || prompt.trim().length === 0) return "Please enter a prompt.";
   if (prompt.length > MAX_PROMPT_LENGTH) {
     return `Prompt exceeds ${MAX_PROMPT_LENGTH.toLocaleString()} character limit.`;
   }
   return null;
-}
-
-/** Collect preset values from select/textarea elements. */
-export function collectPreset(
-  intentEl: HTMLSelectElement,
-  toneEl: HTMLSelectElement,
-  formatEl: HTMLSelectElement,
-  contextEl: HTMLTextAreaElement
-): RewritePreset {
-  const preset: RewritePreset = {};
-  const intent = intentEl.value;
-  if (intent) preset.intent = intent as PromptIntent;
-  preset.tone = toneEl.value as RewriteTone;
-  preset.output_format = formatEl.value as OutputFormat;
-  const ctx = contextEl.value.trim();
-  if (ctx) preset.additional_context = ctx;
-  return preset;
 }
 
 /** Return color for a score value (green/yellow/red). */

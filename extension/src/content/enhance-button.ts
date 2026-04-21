@@ -24,6 +24,55 @@ function dismissCard(): void {
 }
 
 /**
+ * Construct the brief panel with safe DOM APIs.
+ * Every LLM-derived string is written via `textContent` — never `innerHTML` —
+ * so adversarial content in brief fields cannot execute as HTML/JS in the
+ * host page origin. Exported for XSS regression testing.
+ */
+export function buildBriefPanel(brief: ConversationBrief): HTMLElement {
+  const panel = document.createElement("div");
+  panel.className = "cl-brief-panel";
+  panel.hidden = true;
+
+  const appendTextSection = (label: string, value: string): void => {
+    if (!value) return;
+    const section = document.createElement("div");
+    section.className = "cl-brief-section";
+    const heading = document.createElement("strong");
+    heading.textContent = label;
+    const body = document.createElement("p");
+    body.textContent = value;
+    section.appendChild(heading);
+    section.appendChild(body);
+    panel.appendChild(section);
+  };
+
+  const appendListSection = (label: string, items: string[]): void => {
+    if (!items || items.length === 0) return;
+    const section = document.createElement("div");
+    section.className = "cl-brief-section";
+    const heading = document.createElement("strong");
+    heading.textContent = label;
+    const list = document.createElement("ul");
+    for (const item of items) {
+      const li = document.createElement("li");
+      li.textContent = item;
+      list.appendChild(li);
+    }
+    section.appendChild(heading);
+    section.appendChild(list);
+    panel.appendChild(section);
+  };
+
+  appendTextSection("Goal", brief.goal);
+  appendTextSection("Topic", brief.activeTopic);
+  appendListSection("Context", brief.establishedContext);
+  appendListSection("Not repeating", brief.avoid);
+
+  return panel;
+}
+
+/**
  * Show the bottom-right preview card with the enhanced prompt.
  * "Use this prompt" injects into the textarea. "Copy" copies to clipboard.
  * When brief is provided (STATE 2/3), chip is clickable and shows brief panel.
@@ -79,23 +128,10 @@ function showPreviewCard(
     chip.setAttribute("aria-label", "View conversation brief");
     chip.setAttribute("tabindex", "0");
 
-    // Build expandable brief panel (hidden by default)
-    const briefPanel = document.createElement("div");
-    briefPanel.className = "cl-brief-panel";
-    briefPanel.hidden = true;
-
-    const briefContent = [
-      brief.goal ? `<div class="cl-brief-section"><strong>Goal</strong><p>${brief.goal}</p></div>` : "",
-      brief.activeTopic ? `<div class="cl-brief-section"><strong>Topic</strong><p>${brief.activeTopic}</p></div>` : "",
-      brief.establishedContext.length > 0
-        ? `<div class="cl-brief-section"><strong>Context</strong><ul>${brief.establishedContext.map((c) => `<li>${c}</li>`).join("")}</ul></div>`
-        : "",
-      brief.avoid.length > 0
-        ? `<div class="cl-brief-section"><strong>Not repeating</strong><ul>${brief.avoid.map((a) => `<li>${a}</li>`).join("")}</ul></div>`
-        : "",
-    ].filter(Boolean).join("");
-
-    briefPanel.innerHTML = briefContent;
+    // Build expandable brief panel (hidden by default).
+    // All LLM-derived strings are inserted via textContent to prevent XSS;
+    // see buildBriefPanel for the safe DOM construction.
+    const briefPanel = buildBriefPanel(brief);
 
     const closePanelBtn = document.createElement("button");
     closePanelBtn.className = "cl-brief-close";
@@ -261,10 +297,14 @@ function showErrorCard(message: string): void {
 
   const root = document.createElement("div");
   root.className = "cl-card-root cl-card-error";
+  root.setAttribute("role", "alert");
+  root.setAttribute("aria-live", "assertive");
 
   const header = document.createElement("div");
   header.className = "cl-card-header";
-  header.innerHTML = `<span>⚠ Clairity error</span>`;
+  const headerLabel = document.createElement("span");
+  headerLabel.textContent = "⚠ Clairity error";
+  header.appendChild(headerLabel);
 
   const closeBtn = document.createElement("button");
   closeBtn.className = "cl-card-close";

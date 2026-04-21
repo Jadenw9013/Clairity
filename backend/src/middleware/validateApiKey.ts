@@ -3,22 +3,44 @@ import type { Request, Response } from "express";
 const API_KEY_PREFIX = "sk-ant-";
 const API_KEY_MAX_LENGTH = 200;
 
+function isProduction(): boolean {
+  return process.env["NODE_ENV"] === "production";
+}
+
 /**
  * Validate and extract the x-api-key header.
  *
  * Returns:
  *  - string: valid API key
- *  - null: no key provided (rely on server-side env key)
- *  - false: malformed key — 400 already sent on res
+ *  - null: no key provided AND non-production — caller may fall back to env key
+ *  - false: error already sent on res (missing in production, or malformed)
+ *
+ * In production the `x-api-key` header is mandatory: the server must never
+ * spend operator quota for anonymous callers. In non-production builds a
+ * missing key is allowed so local dev can rely on `ANTHROPIC_API_KEY`.
  */
 export function validateApiKey(req: Request, res: Response): string | null | false {
   const raw = req.headers["x-api-key"];
   if (!raw || (typeof raw === "string" && raw.length === 0)) {
-    return null; // No user key — backend will use env key
+    if (isProduction()) {
+      res.status(401).json({
+        error: "x-api-key header is required.",
+        code: "MISSING_API_KEY",
+      });
+      return false;
+    }
+    return null; // Dev only: backend may fall back to env key
   }
 
   const key = Array.isArray(raw) ? raw[0] : raw;
   if (!key || typeof key !== "string") {
+    if (isProduction()) {
+      res.status(401).json({
+        error: "x-api-key header is required.",
+        code: "MISSING_API_KEY",
+      });
+      return false;
+    }
     return null;
   }
 

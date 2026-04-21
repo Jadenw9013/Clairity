@@ -2,9 +2,9 @@ import { describe, it, expect, beforeAll } from "vitest";
 import request from "supertest";
 import { app } from "../src/server.js";
 
-// Set a test secret so token signing works
+// Set a test secret so token signing works (must be >= 32 chars)
 beforeAll(() => {
-  process.env["SESSION_SECRET"] = "test-secret-at-least-16-chars!!";
+  process.env["SESSION_SECRET"] = "test-secret-with-at-least-thirty-two-characters";
 });
 
 describe("POST /v1/session", () => {

@@ -29,7 +29,17 @@ function getClient(apiKey?: string): Anthropic | null {
   if (apiKey) {
     return new Anthropic({ apiKey, timeout: TIMEOUT_MS, maxRetries: MAX_RETRIES });
   }
-  // Env key: reuse singleton
+  // In production, NEVER spend operator quota for callers that omit x-api-key.
+  // The validateApiKey middleware already rejects those requests; this is a
+  // defense-in-depth guard for any future code path that bypasses it.
+  if (process.env["NODE_ENV"] === "production") {
+    logger.warn(
+      { module: "llmClient" },
+      "Refusing env-key fallback in production — x-api-key is required"
+    );
+    return null;
+  }
+  // Dev only: reuse singleton backed by env key for local testing
   const envKey = process.env["ANTHROPIC_API_KEY"] ?? process.env["LLM_API_KEY"] ?? "";
   if (!envKey) {
     logger.warn({ module: "llmClient" }, "ANTHROPIC_API_KEY not set — rewrite will fallback");

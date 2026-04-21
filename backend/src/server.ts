@@ -22,14 +22,21 @@ const CORS_ORIGIN = process.env["CORS_ORIGIN"] ?? "*";
 const NODE_ENV = process.env["NODE_ENV"] ?? "development";
 logFeatureFlags(logger);
 
+// SESSION_SECRET is required in every environment so that a mis-set
+// NODE_ENV (e.g. staging running as "development") cannot silently sign
+// production-grade tokens with a weak or defaulted secret.
+const SESSION_SECRET = process.env["SESSION_SECRET"] ?? "";
+if (SESSION_SECRET.length < 32) {
+  logger.fatal(
+    "SESSION_SECRET is required and must be at least 32 characters."
+  );
+  process.exit(1);
+}
+
 // Strict production validations
 if (NODE_ENV === "production") {
   if (CORS_ORIGIN === "*") {
     logger.fatal("CORS_ORIGIN=* is not allowed in production. Set an explicit origin.");
-    process.exit(1);
-  }
-  if (!process.env["SESSION_SECRET"]) {
-    logger.fatal("SESSION_SECRET is required in production. Must be at least 32 characters.");
     process.exit(1);
   }
 }

@@ -2,11 +2,14 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 const SEPARATOR = ".";
 const TOKEN_LIFETIME_S = 3600; // 1 hour
+const MIN_SECRET_LENGTH = 32;
 
 function getSecret(): string {
   const secret = process.env["SESSION_SECRET"];
-  if (!secret || secret.length < 16) {
-    throw new Error("SESSION_SECRET must be set and at least 16 characters");
+  if (!secret || secret.length < MIN_SECRET_LENGTH) {
+    throw new Error(
+      `SESSION_SECRET must be set and at least ${MIN_SECRET_LENGTH} characters`
+    );
   }
   return secret;
 }
@@ -47,6 +50,7 @@ export function verifyToken(token: string): TokenPayload | null {
     if (parts.length !== 2) return null;
 
     const [encoded, providedSig] = parts as [string, string];
+    if (!encoded || !providedSig) return null;
     const expectedSig = sign(encoded, secret);
 
     // Constant-time comparison to prevent timing attacks
@@ -55,9 +59,22 @@ export function verifyToken(token: string): TokenPayload | null {
     if (sigBuf.length !== expectedBuf.length) return null;
     if (!timingSafeEqual(sigBuf, expectedBuf)) return null;
 
-    const payload = JSON.parse(
+    // Treat the decoded JSON as untrusted input until every field is
+    // shape-validated. A signature match proves integrity, not structure.
+    const raw: unknown = JSON.parse(
       Buffer.from(encoded, "base64url").toString("utf8")
-    ) as TokenPayload;
+    );
+    if (!raw || typeof raw !== "object") return null;
+    const obj = raw as Record<string, unknown>;
+    if (typeof obj["sid"] !== "string" || obj["sid"].length === 0) return null;
+    if (typeof obj["exp"] !== "number" || !Number.isFinite(obj["exp"])) return null;
+    if (typeof obj["iat"] !== "number" || !Number.isFinite(obj["iat"])) return null;
+
+    const payload: TokenPayload = {
+      sid: obj["sid"] as string,
+      iat: obj["iat"] as number,
+      exp: obj["exp"] as number,
+    };
 
     // Check expiry
     const now = Math.floor(Date.now() / 1000);

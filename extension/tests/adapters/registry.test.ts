@@ -44,11 +44,31 @@ describe("Adapter registry", () => {
     expect(detectAdapter()).toBeNull();
   });
 
-  it("returns null for gemini (not yet implemented)", () => {
+  it("detects Gemini adapter for gemini.google.com", () => {
     Object.defineProperty(window, "location", {
-      value: { origin: "https://gemini.google.com" },
+      value: { origin: "https://gemini.google.com", pathname: "/" },
+      writable: true,
+    });
+    const adapter = detectAdapter();
+    expect(adapter).not.toBeNull();
+    expect(adapter?.id).toBe("gemini");
+  });
+
+  it("returns null for bare google.com (content script must not run on Search home)", () => {
+    Object.defineProperty(window, "location", {
+      value: { origin: "https://www.google.com", pathname: "/" },
       writable: true,
     });
     expect(detectAdapter()).toBeNull();
+  });
+
+  it("detects Gemini adapter on Google AI Mode search path", () => {
+    Object.defineProperty(window, "location", {
+      value: { origin: "https://www.google.com", pathname: "/search" },
+      writable: true,
+    });
+    const adapter = detectAdapter();
+    expect(adapter).not.toBeNull();
+    expect(adapter?.id).toBe("gemini");
   });
 });

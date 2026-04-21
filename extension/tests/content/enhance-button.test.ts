@@ -1,18 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { injectEnhanceButton } from "../../src/content/enhance-button.js";
-import type { SiteAdapter } from "shared/types/index.js";
+import { injectEnhanceButton, buildBriefPanel } from "../../src/content/enhance-button.js";
+import type { SiteAdapter, ConversationBrief } from "shared/types/index.js";
 
-// Mock chrome.storage.local
-const mockStorageGet = vi.fn();
 (global as any).chrome = {
-    storage: {
-        local: {
-            get: mockStorageGet
-        }
-    },
     runtime: {
-        sendMessage: vi.fn()
-    }
+        sendMessage: vi.fn(),
+    },
 };
 
 describe("injectEnhanceButton", () => {
@@ -40,16 +33,13 @@ describe("injectEnhanceButton", () => {
             getButtonAnchor: () => anchor,
             destroy: vi.fn()
         } as any;
-
-        // Default mock response: Simple Mode
-        mockStorageGet.mockImplementation((keys, cb) => cb({ uxMode: "simple" }));
     });
 
     afterEach(() => {
         HTMLElement.prototype.attachShadow = originalAttachShadow;
     });
 
-    it("injects button with aria-label and default Simple text", () => {
+    it("injects a button with the accessible label", () => {
         injectEnhanceButton(adapter, anchor);
         const host = document.getElementById("clairity-enhance-root");
         expect(host).not.toBeNull();
@@ -58,17 +48,78 @@ describe("injectEnhanceButton", () => {
         expect(shadow).toBeDefined();
 
         const btn = shadow?.querySelector("button");
-        expect(btn?.getAttribute("aria-label")).toBe("Enhance prompt");
-        expect(btn?.textContent).toBe("Fix my question");
+        expect(btn?.getAttribute("aria-label")).toBe("Enhance prompt with Clairity");
+        // textContent concatenates the icon glyph and label inside the pill button.
+        expect(btn?.textContent).toContain("Enhance Request");
     });
 
-    it("injects Advanced text if storage returns advanced mode", () => {
-        mockStorageGet.mockImplementation((keys, cb) => cb({ uxMode: "advanced" }));
+    it("is idempotent — repeat calls do not inject a second button", () => {
         injectEnhanceButton(adapter, anchor);
-
-        const shadow = document.getElementById("clairity-enhance-root")?.shadowRoot;
-        const btn = shadow?.querySelector("button");
-        expect(btn?.textContent).toBe("Enhance Request");
+        injectEnhanceButton(adapter, anchor);
+        const hosts = document.querySelectorAll("#clairity-enhance-root");
+        expect(hosts.length).toBe(1);
     });
 
+});
+
+describe("buildBriefPanel — XSS regression", () => {
+    // Regression: the brief panel previously used innerHTML, so an LLM-emitted
+    // brief containing HTML/JS (via prompt-injection) would execute in the host
+    // page origin. All fields must now be rendered via textContent.
+    function makeBrief(overrides: Partial<ConversationBrief>): ConversationBrief {
+        return {
+            goal: "",
+            establishedContext: [],
+            userStyle: "",
+            activeTopic: "",
+            avoid: [],
+            messageCount: 0,
+            lastUpdatedAt: 0,
+            ...overrides,
+        };
+    }
+
+    it("renders an <img onerror> payload in goal as plain text, not an element", () => {
+        const payload = '<img src=x onerror="window.__xss=1">';
+        const panel = buildBriefPanel(makeBrief({ goal: payload }));
+
+        expect(panel.querySelector("img")).toBeNull();
+        expect(panel.textContent).toContain(payload);
+        expect((window as unknown as Record<string, unknown>)["__xss"]).toBeUndefined();
+    });
+
+    it("renders <script> tags in activeTopic as plain text", () => {
+        const payload = '<script>window.__pwned=1</script>';
+        const panel = buildBriefPanel(makeBrief({ activeTopic: payload }));
+
+        expect(panel.querySelector("script")).toBeNull();
+        expect(panel.textContent).toContain(payload);
+        expect((window as unknown as Record<string, unknown>)["__pwned"]).toBeUndefined();
+    });
+
+    it("renders HTML payloads inside establishedContext[] and avoid[] list items as text", () => {
+        const ctxPayload = '<iframe src="javascript:alert(1)"></iframe>';
+        const avoidPayload = '<svg onload=alert(1)>';
+        const panel = buildBriefPanel(makeBrief({
+            establishedContext: [ctxPayload],
+            avoid: [avoidPayload],
+        }));
+
+        expect(panel.querySelector("iframe")).toBeNull();
+        expect(panel.querySelector("svg")).toBeNull();
+
+        const listItems = Array.from(panel.querySelectorAll("li")).map((li) => li.textContent);
+        expect(listItems).toContain(ctxPayload);
+        expect(listItems).toContain(avoidPayload);
+    });
+
+    it("omits sections whose string is empty and lists that are empty", () => {
+        const panel = buildBriefPanel(makeBrief({ goal: "Only goal" }));
+        // Goal present, Topic/Context/Not-repeating skipped
+        expect(panel.textContent).toContain("Goal");
+        expect(panel.textContent).toContain("Only goal");
+        expect(panel.textContent).not.toContain("Topic");
+        expect(panel.textContent).not.toContain("Context");
+        expect(panel.textContent).not.toContain("Not repeating");
+    });
 });
