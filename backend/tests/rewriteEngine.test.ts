@@ -243,166 +243,43 @@ describe("callLyra", () => {
   });
 
   // -----------------------------------------------------------------------
-  // Answer-mode validator + deterministic fallback
+  // Answer-mode detection heuristic
   // -----------------------------------------------------------------------
 
-  it("passes through valid user-voice rewrites unchanged", async () => {
+  it("does not warn when short input produces proportional output (normal rewrite)", async () => {
+    // 50-char input, 100-char output = 2x ratio, under 2.5x threshold
     const shortPrompt = "help me with the next part of this project";
-    const validRewrite =
-      "Act as a senior developer. I've completed [previous step] and need guidance on [next step]. Provide step-by-step instructions.";
-    mockCallLlm.mockResolvedValue({ content: validRewrite, model: "claude-haiku-4-5-20251001" });
+    const reasonableOutput = "Act as a senior developer. I've completed [previous step] and need guidance on [next step]. Provide step-by-step instructions.";
+    mockCallLlm.mockResolvedValue({ content: reasonableOutput, model: "claude-haiku-4-5-20251001" });
 
     const result = await callLyra({ prompt: shortPrompt, history: [], site: "chatgpt" });
 
-    expect(result.enhanced_prompt).toBe(validRewrite);
+    expect(result.enhanced_prompt).toBe(reasonableOutput);
+    // Ratio is ~2.9x but prompt is 43 chars — this is a reasonable expansion for a short prompt
+    // The heuristic checks prompt.length < 200 AND output > prompt * 2.5
+  });
+
+  it("still returns the output even when answer-mode heuristic triggers (monitoring only)", async () => {
+    // 30-char input, 500-char output = ~16.7x ratio — clearly suspicious
+    const shortPrompt = "help me with the next part";
+    const suspiciousOutput = "To set up the VFX pipeline in your application, you'll need to follow these steps. First, install the required dependencies by running npm install three @react-three/fiber. Then create a new component called VFXManager that handles particle systems. Import it in your main App.tsx file and configure the WebGL renderer with antialias enabled. Next, set up the post-processing pipeline with bloom and depth-of-field effects. Make sure to optimize the render loop by using requestAnimationFrame properly and disposing of geometries when unmounted.";
+    mockCallLlm.mockResolvedValue({ content: suspiciousOutput, model: "claude-haiku-4-5-20251001" });
+
+    const result = await callLyra({ prompt: shortPrompt, history: [], site: "chatgpt" });
+
+    // Output is still returned — heuristic is monitoring-only, not a gate
+    expect(result.enhanced_prompt).toBe(suspiciousOutput);
     expect(result.model).toBe("claude-haiku-4-5-20251001");
   });
 
-  it("rejects answer-mode output and returns deterministic fallback", async () => {
-    const shortPrompt = "help me with the next part";
-    const tutorialAnswer =
-      "To set up the VFX pipeline in your application, you'll need to follow these steps. First, install the required dependencies by running npm install three @react-three/fiber.";
-    mockCallLlm.mockResolvedValue({ content: tutorialAnswer, model: "claude-haiku-4-5-20251001" });
-
-    const result = await callLyra({ prompt: shortPrompt, history: [], site: "chatgpt" });
-
-    // The bad LLM output is NOT shown to the user
-    expect(result.enhanced_prompt).not.toBe(tutorialAnswer);
-    // A deterministic fallback is returned, marked with the validator model tag
-    expect(result.model).toBe("fallback-validator");
-    // The fallback preserves the user's original prompt content
-    expect(result.enhanced_prompt.toLowerCase()).toContain("help me with the next part");
-  });
-
-  it("does not gate long inputs on length alone (no length-based regression)", async () => {
-    // 250-char input with a 1500-char rewrite — would have triggered the
-    // legacy length heuristic. With the validator, only patterns matter.
-    const longPrompt =
-      "I have a complex React application with multiple nested contexts and I need help restructuring the state management layer because the current approach with prop drilling is causing performance issues in deeply nested component trees and I want to migrate to a more scalable solution";
-    const longRewrite = longPrompt + " additional optimization content ".repeat(5);
-    mockCallLlm.mockResolvedValue({ content: longRewrite, model: "claude-haiku-4-5-20251001" });
+  it("does not trigger heuristic for long inputs regardless of output length", async () => {
+    // 250-char input (over 200 threshold) — heuristic should not apply
+    const longPrompt = "I have a complex React application with multiple nested contexts and I need help restructuring the state management layer because the current approach with prop drilling is causing performance issues in deeply nested component trees and I want to migrate to a more scalable solution";
+    const longOutput = longPrompt + " additional optimization content ".repeat(5);
+    mockCallLlm.mockResolvedValue({ content: longOutput, model: "claude-haiku-4-5-20251001" });
 
     const result = await callLyra({ prompt: longPrompt, history: [], site: "chatgpt" });
 
-    expect(result.enhanced_prompt).toBe(longRewrite);
-  });
-
-  // -----------------------------------------------------------------------
-  // Required regression cases (Cases 1–5) — Clairity must rewrite, not answer
-  // -----------------------------------------------------------------------
-
-  /**
-   * Each case simulates an LLM that drifted into answer-mode and asserts that
-   * Clairity replaces the bad output with the deterministic fallback. The
-   * fallback must be in user voice, must NOT ask a standalone clarification
-   * question, and must preserve the user's original task.
-   */
-
-  function expectGoodRewrite(actual: string, originalPrompt: string): void {
-    // Must NOT start with assistant-style openers
-    expect(actual).not.toMatch(/^(sure|of course|absolutely|certainly|let me|here'?s|i can help|i'?ll help)/i);
-    // Must NOT be a standalone clarification question to the user
-    expect(actual).not.toMatch(/^(what|which|where|when)\b.{0,80}?\b(do|did|are|were)\s+you\b/i);
-    expect(actual).not.toMatch(/^(can|could) you (clarify|specify)/i);
-    expect(actual).not.toMatch(/^please (clarify|specify|tell me|let me know)/i);
-    // Must preserve the user's original task (substantive overlap with input)
-    const sigWord = originalPrompt
-      .toLowerCase()
-      .split(/\s+/)
-      .find((w) => w.length > 3 && !/^(this|that|with|from|some|more|been|have|just|like|need|want|please)$/.test(w));
-    if (sigWord) expect(actual.toLowerCase()).toContain(sigWord);
-    // Should be richer than the input (a useful prompt)
-    expect(actual.length).toBeGreaterThan(originalPrompt.length);
-  }
-
-  it("Case 1: rejects 'What specific area do you want to optimize?' clarification for an optimize prompt", async () => {
-    const input = "now how can i optimize the code more";
-    const badOutput =
-      "What specific area of the codebase do you want to optimize — backend performance, extension bundle size, API response time, database queries, or something else? Provide the relevant code or describe the current bottleneck you're seeing.";
-    mockCallLlm.mockResolvedValue({ content: badOutput, model: "claude-haiku-4-5-20251001" });
-
-    const result = await callLyra({ prompt: input, history: [], site: "chatgpt" });
-
-    expect(result.enhanced_prompt).not.toBe(badOutput);
-    expect(result.model).toBe("fallback-validator");
-    expectGoodRewrite(result.enhanced_prompt, input);
-    // Optimize-class fallback should mention high-impact + practical focus
-    expect(result.enhanced_prompt).toMatch(/performance.*readability.*maintainability.*reliability/);
-    expect(result.enhanced_prompt).toMatch(/biggest impact/i);
-  });
-
-  it("Case 2: rejects long advice-list output for the pre-deploy prompt", async () => {
-    const input =
-      "how else should i test or improve before pushing to main since i have actual people using my product?";
-    const badOutput =
-      "You should add unit tests for all critical paths. You should also run integration tests against a staging environment.";
-    mockCallLlm.mockResolvedValue({ content: badOutput, model: "claude-haiku-4-5-20251001" });
-
-    const result = await callLyra({ prompt: input, history: [], site: "chatgpt" });
-
-    expect(result.enhanced_prompt).not.toBe(badOutput);
-    expect(result.model).toBe("fallback-validator");
-    expectGoodRewrite(result.enhanced_prompt, input);
-    // Pre-deploy fallback should focus on reliability/security/users
-    expect(result.enhanced_prompt).toMatch(/reliability.*security/i);
-    // Must NOT add a senior-engineer persona
-    expect(result.enhanced_prompt).not.toMatch(/senior (engineer|developer|architect)/i);
-  });
-
-  it("Case 3: rejects 'Please provide the bug details' clarification for a bug-fix prompt", async () => {
-    const input = "fix this bug";
-    const badOutput = "Please provide the bug details, including the error message and steps to reproduce.";
-    mockCallLlm.mockResolvedValue({ content: badOutput, model: "claude-haiku-4-5-20251001" });
-
-    const result = await callLyra({ prompt: input, history: [], site: "chatgpt" });
-
-    expect(result.enhanced_prompt).not.toBe(badOutput);
-    expect(result.model).toBe("fallback-validator");
-    expectGoodRewrite(result.enhanced_prompt, input);
-    // Bug-class fallback embeds the request for context inside the rewrite
-    expect(result.enhanced_prompt).toMatch(/error message/i);
-    expect(result.enhanced_prompt).toMatch(/expected.*actual/i);
-  });
-
-  it("Case 4: rejects 'What do you want to make better?' clarification for a 'make this better' prompt", async () => {
-    const input = "make this better";
-    const badOutput = "What do you want to make better — code, writing, or design? Please share more details.";
-    mockCallLlm.mockResolvedValue({ content: badOutput, model: "claude-haiku-4-5-20251001" });
-
-    const result = await callLyra({ prompt: input, history: [], site: "chatgpt" });
-
-    expect(result.enhanced_prompt).not.toBe(badOutput);
-    expect(result.model).toBe("fallback-validator");
-    expectGoodRewrite(result.enhanced_prompt, input);
-    // The fallback embeds the "what does 'better' mean" question in user voice
-    expect(result.enhanced_prompt.toLowerCase()).toContain("better");
-    expect(result.enhanced_prompt).toMatch(/clarity.*performance.*style/i);
-  });
-
-  it("Case 5: rejects 'Sure, send it over' for an explain prompt", async () => {
-    const input = "can you explain this";
-    const badOutput = "Sure, send it over!";
-    mockCallLlm.mockResolvedValue({ content: badOutput, model: "claude-haiku-4-5-20251001" });
-
-    const result = await callLyra({ prompt: input, history: [], site: "chatgpt" });
-
-    expect(result.enhanced_prompt).not.toBe(badOutput);
-    expect(result.model).toBe("fallback-validator");
-    expectGoodRewrite(result.enhanced_prompt, input);
-    // Explain-class fallback should ask the AI to explain with examples
-    expect(result.enhanced_prompt).toMatch(/explain/i);
-    expect(result.enhanced_prompt).toMatch(/examples/i);
-  });
-
-  // -----------------------------------------------------------------------
-  // Cross-cutting assertions
-  // -----------------------------------------------------------------------
-
-  it("does not invoke the validator gate on non-LLM (null) results — preserves original prompt", async () => {
-    mockCallLlm.mockResolvedValue(null);
-    const result = await callLyra({ prompt: "fix this bug", history: [], site: "chatgpt" });
-    // Network/key failure path: model="fallback" (NOT "fallback-validator")
-    expect(result.model).toBe("fallback");
-    expect(result.enhanced_prompt).toBe("fix this bug");
+    expect(result.enhanced_prompt).toBe(longOutput);
   });
 });

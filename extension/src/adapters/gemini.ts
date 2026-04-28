@@ -159,10 +159,7 @@ function getGoogleAIModeAnchor(adapter: { getPromptElement(): HTMLElement | null
 export const geminiAdapter: SiteAdapter = {
   id: "gemini",
   name: "Gemini",
-  // Match only full Gemini app and Google AI Mode search path.
-  // Bare google.com/* is intentionally excluded — content script should
-  // not run on every Google property (Search, Maps, News, etc.).
-  urlPattern: /^https:\/\/(gemini\.google\.com|www\.google\.com\/search)/,
+  urlPattern: /^https:\/\/(gemini\.google\.com|www\.google\.com\/search|google\.com)/,
 
   detect(): boolean {
     return this.urlPattern.test(window.location.origin + window.location.pathname);
@@ -210,7 +207,7 @@ export const geminiAdapter: SiteAdapter = {
     }
 
     // ── google.com AI Mode (search?udm=50) — simpler toolbar ─────────
-    if (hostname === "www.google.com") {
+    if (hostname === "www.google.com" || hostname === "google.com") {
       return getGoogleAIModeAnchor(this);
     }
 

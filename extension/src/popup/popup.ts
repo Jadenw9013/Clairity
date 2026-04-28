@@ -146,14 +146,13 @@ async function handleEnhance(): Promise<void> {
       showResult(response.payload as RewriteResponse);
     } else if (response?.type === "REWRITE_ERROR") {
       const data = response.payload as ErrorResponse;
-      showError(data.error || "The backend rejected this request. Please try again.");
+      showError(data.error);
     } else {
-      showError("Couldn't reach the Clairity backend. Please reload the extension and try again.");
+      showError("Unexpected response from service worker.");
     }
   } catch (err: unknown) {
-    // Surface a user-actionable message; log technical detail for devs.
-    console.error("[Clairity] enhance failed:", err);
-    showError("Something went wrong while enhancing your prompt. Please try again.");
+    const message = err instanceof Error ? err.message : "Unknown error";
+    showError(`Failed to enhance prompt: ${message}`);
   } finally {
     port.disconnect();
     setLoading(false);

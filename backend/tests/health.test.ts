@@ -6,7 +6,7 @@ import { app } from "../src/server.js";
 let sharedToken: string;
 
 beforeAll(async () => {
-  process.env["SESSION_SECRET"] = "test-secret-with-at-least-thirty-two-characters";
+  process.env["SESSION_SECRET"] = "test-secret-at-least-16-chars!!";
   const res = await request(app).post("/v1/session");
   sharedToken = res.body.token as string;
 });

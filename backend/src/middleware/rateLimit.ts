@@ -1,15 +1,4 @@
 import rateLimit from "express-rate-limit";
-import type { Request } from "express";
-
-/**
- * Rate-limit key derivation.
- *
- * Always keys on the client IP so that a caller cannot multiply their
- * effective throughput by rotating session tokens. Exported for tests.
- */
-export function getApiLimitKey(req: Request): string {
-  return req.ip ?? "unknown";
-}
 
 /**
  * Rate limiter for general API endpoints.
@@ -21,7 +10,12 @@ export const apiLimiter = rateLimit({
   limit: 60,
   standardHeaders: "draft-7",
   legacyHeaders: false,
-  keyGenerator: getApiLimitKey,
+  keyGenerator: (req) => {
+    // Prefer session ID if authenticated, else fall back to IP
+    const sessionId = (req as unknown as Record<string, unknown>)["sessionId"];
+    if (typeof sessionId === "string") return sessionId;
+    return req.ip ?? "unknown";
+  },
   handler: (_req, res) => {
     res.status(429).json({
       error: "Rate limit exceeded. Please wait before retrying.",

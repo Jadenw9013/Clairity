@@ -16,82 +16,29 @@ const MAX_BRIEF_HISTORY_MESSAGES = 20;
 const MAX_BRIEF_MSG_CHARS = 500;
 
 /**
- * Extract the first balanced JSON object from a string. Tolerates markdown
- * code fences or trailing commentary around a single `{...}` object.
- * Returns the substring or null if no balanced object is found.
- *
- * Preferred over a greedy `/\{[\s\S]*\}/` regex because that pattern picks
- * up stray trailing braces and can fail on inputs with multiple objects.
- */
-export function extractJsonObject(raw: string): string | null {
-  const start = raw.indexOf("{");
-  if (start === -1) return null;
-
-  let depth = 0;
-  let inString = false;
-  let escape = false;
-  for (let i = start; i < raw.length; i++) {
-    const ch = raw[i];
-    if (inString) {
-      if (escape) { escape = false; continue; }
-      if (ch === "\\") { escape = true; continue; }
-      if (ch === '"') inString = false;
-      continue;
-    }
-    if (ch === '"') { inString = true; continue; }
-    if (ch === "{") depth++;
-    else if (ch === "}") {
-      depth--;
-      if (depth === 0) return raw.slice(start, i + 1);
-    }
-  }
-  return null;
-}
-
-/**
- * Defense-in-depth sanitiser for LLM-emitted brief strings.
- * Strips ASCII and Unicode control characters (which have no semantic
- * meaning in a brief and can break logs/UIs). HTML angle brackets are
- * preserved — the client is responsible for safe rendering via textContent.
- */
-function sanitizeBriefString(s: string): string {
-  let out = "";
-  for (let i = 0; i < s.length; i++) {
-    const code = s.charCodeAt(i);
-    // Strip C0 (0-31), DEL (127), and C1 (128-159) control blocks
-    if (code <= 31 || code === 127 || (code >= 128 && code <= 159)) continue;
-    out += s[i];
-  }
-  return out.trim();
-}
-
-/**
  * Parse raw LLM JSON output into a ConversationBrief.
  * Returns null if the shape is invalid or JSON is malformed.
  */
 function parseBriefJson(raw: string, messageCount: number): ConversationBrief | null {
   try {
-    const jsonText = extractJsonObject(raw);
-    if (!jsonText) return null;
+    // Extract JSON from potential markdown code fences
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return null;
 
-    const parsed = JSON.parse(jsonText) as Record<string, unknown>;
-    const goal = typeof parsed["goal"] === "string" ? sanitizeBriefString(parsed["goal"]) : "";
-    const userStyle = typeof parsed["userStyle"] === "string" ? sanitizeBriefString(parsed["userStyle"]) : "";
-    const activeTopic = typeof parsed["activeTopic"] === "string" ? sanitizeBriefString(parsed["activeTopic"]) : "";
+    const parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
+    const goal = typeof parsed["goal"] === "string" ? parsed["goal"] : "";
+    const userStyle = typeof parsed["userStyle"] === "string" ? parsed["userStyle"] : "";
+    const activeTopic = typeof parsed["activeTopic"] === "string" ? parsed["activeTopic"] : "";
 
     const establishedContext = Array.isArray(parsed["establishedContext"])
       ? (parsed["establishedContext"] as unknown[])
           .filter((x): x is string => typeof x === "string")
-          .map(sanitizeBriefString)
-          .filter((x) => x.length > 0)
           .slice(0, 5)
       : [];
 
     const avoid = Array.isArray(parsed["avoid"])
       ? (parsed["avoid"] as unknown[])
           .filter((x): x is string => typeof x === "string")
-          .map(sanitizeBriefString)
-          .filter((x) => x.length > 0)
           .slice(0, 5)
       : [];
 
