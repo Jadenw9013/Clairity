@@ -5,6 +5,7 @@
 import { buildSystemPrompt, type Message } from "./llmPrompts.js";
 import { callLlm } from "./llmClient.js";
 import { logger } from "./logger.js";
+import { validateRewrite, buildDeterministicRewrite } from "./rewriteValidator.js";
 import type { Site, ConversationBrief } from "shared/types/index.ts";
 
 export interface LyraInput {
@@ -93,20 +94,25 @@ export async function callLyra(input: LyraInput): Promise<LyraOutput> {
     return { enhanced_prompt: prompt, model: "fallback" };
   }
 
-  // Answer-mode detection heuristic: if the output is significantly longer
-  // than a short input, the model may have answered the prompt instead of
-  // rewriting it. Log for monitoring — do not reject or alter the output.
-  if (prompt.length < 200 && result.content.length > prompt.length * 2.5) {
+  // Validator gate: reject answer-mode / clarification-question output and
+  // substitute a deterministic rewrite. Clairity must never surface a chatbot
+  // reply or a follow-up question — that breaks the product contract.
+  const verdict = validateRewrite(result.content, prompt);
+  if (!verdict.ok) {
     logger.warn(
       {
         module: "rewriteEngine",
+        reason: verdict.reason,
         inputLen: prompt.length,
         outputLen: result.content.length,
-        ratio: +(result.content.length / prompt.length).toFixed(1),
         briefActive: !!brief,
       },
-      "Possible answer-mode output detected — result significantly longer than short input"
+      "Rewrite validator rejected LLM output — returning deterministic fallback"
     );
+    return {
+      enhanced_prompt: buildDeterministicRewrite(prompt),
+      model: "fallback-validator",
+    };
   }
 
   return { enhanced_prompt: result.content, model: result.model };

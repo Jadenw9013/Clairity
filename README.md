@@ -57,7 +57,13 @@ Keys are stored in `chrome.storage.local` and passed via `x-api-key` header.
 
 ### Run Backend (dev)
 
+The backend requires a 32-character `SESSION_SECRET` in every environment (used
+to HMAC-sign session tokens). Create `backend/.env` from `backend/.env.example`
+and generate a secret:
+
 ```bash
+cp backend/.env.example backend/.env
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))" >> backend/.env  # paste into SESSION_SECRET=
 npm run dev --workspace=backend
 ```
 

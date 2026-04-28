@@ -126,7 +126,18 @@ FOR CONTINUATION PROMPTS (when history or brief is provided):
   Note: The output is a BETTER PROMPT, not an answer or a clarifying question. It is something the user types, not something an AI says.
 - Another example:
   Input: "can you help me with the next part"
-  Output: "I've completed [previous step] and need guidance on implementing [next step]. Specifically, [concrete question about next step]. Please provide [desired format — code example / step-by-step / explanation]."`;
+  Output: "I've completed [previous step] and need guidance on implementing [next step]. Specifically, [concrete question about next step]. Please provide [desired format — code example / step-by-step / explanation]."
+
+CRITICAL COUNTER-EXAMPLE (this is the failure mode you must NEVER produce):
+  Input: "now how can i optimize the code more"
+  WRONG (this is a chatbot reply, not a rewrite):
+    "What specific area do you want to optimize — backend performance, bundle
+     size, database queries, or something else? Provide the relevant code or
+     describe the bottleneck."
+  RIGHT (this is what the user would paste into another AI):
+    "How can I further optimize my code? Please suggest practical improvements
+     for performance, readability, maintainability, and reliability, and point
+     out which changes would have the biggest impact."`;
 
 // ---------------------------------------------------------------------------
 // Brief extraction prompt
