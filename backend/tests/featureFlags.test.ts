@@ -14,39 +14,35 @@ describe("logFeatureFlags", () => {
     process.env = { ...originalEnv };
   });
 
-  it("should log ANTHROPIC_API_KEY_SET as false when env var is not set", () => {
-    delete process.env["ANTHROPIC_API_KEY"];
+  it("should log default ANTHROPIC_MODEL when env var is not set", () => {
+    delete process.env["ANTHROPIC_MODEL"];
 
     const mockLogger = { info: vi.fn() };
     logFeatureFlags(mockLogger);
 
     expect(mockLogger.info).toHaveBeenCalledWith(
-      { ANTHROPIC_API_KEY_SET: false },
+      { ANTHROPIC_MODEL: "claude-haiku-4-5-20251001", API_KEY_MODE: "per-request" },
       "Feature flags"
     );
   });
 
-  it("should log ANTHROPIC_API_KEY_SET as false when env var is an empty string", () => {
-    process.env["ANTHROPIC_API_KEY"] = "";
+  it("should log custom ANTHROPIC_MODEL when env var is set", () => {
+    process.env["ANTHROPIC_MODEL"] = "claude-sonnet-4-20250514";
 
     const mockLogger = { info: vi.fn() };
     logFeatureFlags(mockLogger);
 
     expect(mockLogger.info).toHaveBeenCalledWith(
-      { ANTHROPIC_API_KEY_SET: false },
+      { ANTHROPIC_MODEL: "claude-sonnet-4-20250514", API_KEY_MODE: "per-request" },
       "Feature flags"
     );
   });
 
-  it("should log ANTHROPIC_API_KEY_SET as true when env var is set", () => {
-    process.env["ANTHROPIC_API_KEY"] = "sk-ant-api03-test";
-
+  it("should always log API_KEY_MODE as per-request", () => {
     const mockLogger = { info: vi.fn() };
     logFeatureFlags(mockLogger);
 
-    expect(mockLogger.info).toHaveBeenCalledWith(
-      { ANTHROPIC_API_KEY_SET: true },
-      "Feature flags"
-    );
+    const loggedObj = mockLogger.info.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(loggedObj["API_KEY_MODE"]).toBe("per-request");
   });
 });

@@ -5,8 +5,10 @@
 export function logFeatureFlags(logger: { info: (...args: unknown[]) => void }): void {
   logger.info(
     {
-      ANTHROPIC_API_KEY_SET: (process.env["ANTHROPIC_API_KEY"] ?? "").length > 0,
+      ANTHROPIC_MODEL: process.env["ANTHROPIC_MODEL"] ?? "claude-haiku-4-5-20251001",
+      API_KEY_MODE: "per-request",
     },
     "Feature flags"
   );
 }
+

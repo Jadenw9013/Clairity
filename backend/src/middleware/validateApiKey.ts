@@ -8,18 +8,25 @@ const API_KEY_MAX_LENGTH = 200;
  *
  * Returns:
  *  - string: valid API key
- *  - null: no key provided (rely on server-side env key)
- *  - false: malformed key — 400 already sent on res
+ *  - false: missing or malformed key — 400 already sent on res
  */
-export function validateApiKey(req: Request, res: Response): string | null | false {
+export function validateApiKey(req: Request, res: Response): string | false {
   const raw = req.headers["x-api-key"];
   if (!raw || (typeof raw === "string" && raw.length === 0)) {
-    return null; // No user key — backend will use env key
+    res.status(400).json({
+      error: "Missing x-api-key header. Provide your Anthropic API key.",
+      code: "MISSING_API_KEY",
+    });
+    return false;
   }
 
   const key = Array.isArray(raw) ? raw[0] : raw;
   if (!key || typeof key !== "string") {
-    return null;
+    res.status(400).json({
+      error: "Missing x-api-key header. Provide your Anthropic API key.",
+      code: "MISSING_API_KEY",
+    });
+    return false;
   }
 
   if (!key.startsWith(API_KEY_PREFIX)) {

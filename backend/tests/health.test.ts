@@ -26,6 +26,7 @@ describe("POST /v1/rewrite", () => {
     const res = await request(app)
       .post("/v1/rewrite")
       .set("Authorization", `Bearer ${sharedToken}`)
+      .set("x-api-key", "sk-ant-test-key-for-unit-tests")
       .send({
         prompt: "Help me write a function",
         history: [],
@@ -41,6 +42,7 @@ describe("POST /v1/rewrite", () => {
     const res = await request(app)
       .post("/v1/rewrite")
       .set("Authorization", `Bearer ${sharedToken}`)
+      .set("x-api-key", "sk-ant-test-key-for-unit-tests")
       .send({ site: "chatgpt", history: [] });
     expect(res.status).toBe(400);
     expect(res.body).toHaveProperty("code", "VALIDATION_ERROR");
@@ -50,6 +52,7 @@ describe("POST /v1/rewrite", () => {
     const res = await request(app)
       .post("/v1/rewrite")
       .set("Authorization", `Bearer ${sharedToken}`)
+      .set("x-api-key", "sk-ant-test-key-for-unit-tests")
       .send({ prompt: "test", site: "invalid", history: [] });
     expect(res.status).toBe(400);
     expect(res.body).toHaveProperty("code", "VALIDATION_ERROR");
@@ -59,6 +62,7 @@ describe("POST /v1/rewrite", () => {
     const res = await request(app)
       .post("/v1/rewrite")
       .set("Authorization", `Bearer ${sharedToken}`)
+      .set("x-api-key", "sk-ant-test-key-for-unit-tests")
       .send({ prompt: "", site: "claude", history: [] });
     expect(res.status).toBe(400);
     expect(res.body).toHaveProperty("code", "VALIDATION_ERROR");
@@ -72,6 +76,7 @@ describe("POST /v1/rewrite", () => {
     const res = await request(app)
       .post("/v1/rewrite")
       .set("Authorization", `Bearer ${sharedToken}`)
+      .set("x-api-key", "sk-ant-test-key-for-unit-tests")
       .send({ prompt: "give me an example", site: "gemini", history });
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty("history_length", 2);
@@ -81,6 +86,7 @@ describe("POST /v1/rewrite", () => {
     const res = await request(app)
       .post("/v1/rewrite")
       .set("Authorization", `Bearer ${sharedToken}`)
+      .set("x-api-key", "sk-ant-test-key-for-unit-tests")
       .send({ prompt: "Help me write a REST API", site: "claude", history: [] });
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty("model");
@@ -98,6 +104,7 @@ describe("Payload size limits", () => {
     const res = await request(app)
       .post("/v1/rewrite")
       .set("Authorization", `Bearer ${sharedToken}`)
+      .set("x-api-key", "sk-ant-test-key-for-unit-tests")
       .send({ prompt: oversizedPrompt, site: "chatgpt", history: [] });
     // Express body-parser returns 413 but our error handler catches it as 500
     // Either way, the oversized request is rejected (not 200)
@@ -111,6 +118,7 @@ describe("Input validation limits", () => {
     const res = await request(app)
       .post("/v1/rewrite")
       .set("Authorization", `Bearer ${sharedToken}`)
+      .set("x-api-key", "sk-ant-test-key-for-unit-tests")
       .send({ prompt: longPrompt, site: "chatgpt", history: [] });
     expect(res.status).toBe(400);
     expect(res.body).toHaveProperty("code", "VALIDATION_ERROR");
@@ -124,6 +132,7 @@ describe("Input validation limits", () => {
     const res = await request(app)
       .post("/v1/rewrite")
       .set("Authorization", `Bearer ${sharedToken}`)
+      .set("x-api-key", "sk-ant-test-key-for-unit-tests")
       .send({ prompt: "test", site: "chatgpt", history });
     expect(res.status).toBe(400);
     expect(res.body).toHaveProperty("code", "VALIDATION_ERROR");
@@ -133,6 +142,7 @@ describe("Input validation limits", () => {
     const res = await request(app)
       .post("/v1/rewrite")
       .set("Authorization", `Bearer ${sharedToken}`)
+      .set("x-api-key", "sk-ant-test-key-for-unit-tests")
       .send({
         prompt: "test",
         site: "chatgpt",
@@ -165,12 +175,13 @@ describe("x-api-key validation", () => {
     expect(res.body).toHaveProperty("code", "INVALID_API_KEY");
   });
 
-  it("accepts request without x-api-key (uses server env key)", async () => {
+  it("returns 400 when x-api-key header is missing", async () => {
     const res = await request(app)
       .post("/v1/rewrite")
       .set("Authorization", `Bearer ${sharedToken}`)
       .send({ prompt: "test", site: "chatgpt", history: [] });
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(400);
+    expect(res.body).toHaveProperty("code", "MISSING_API_KEY");
   });
 
   it("accepts request with valid sk-ant- prefixed key", async () => {
@@ -210,6 +221,7 @@ describe("POST /v1/brief/extract", () => {
     const res = await request(app)
       .post("/v1/brief/extract")
       .set("Authorization", `Bearer ${sharedToken}`)
+      .set("x-api-key", "sk-ant-test-key-for-unit-tests")
       .send({ history });
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty("brief");
@@ -272,6 +284,7 @@ describe("Response shape regression", () => {
     const res = await request(app)
       .post("/v1/rewrite")
       .set("Authorization", `Bearer ${sharedToken}`)
+      .set("x-api-key", "sk-ant-test-key-for-unit-tests")
       .send({ prompt: "test prompt", site: "chatgpt", history: [] });
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty("enhanced_prompt");

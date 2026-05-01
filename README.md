@@ -37,7 +37,7 @@ npm run build --workspace=extension
 ```
 Then hit the **refresh icon** on the extension in `chrome://extensions`.
 
-No `.env` setup required. The backend runs on a hosted server. Just build, load, and add your key.
+No `.env` setup required. The backend requires no server-side API keys — your key is sent per-request via the `x-api-key` header. Just build, load, and add your key.
 
 ---
 
@@ -51,7 +51,8 @@ No `.env` setup required. The backend runs on a hosted server. Just build, load,
 ```
 
 Users provide their own Anthropic API key via the extension popup.
-Keys are stored in `chrome.storage.local` and passed via `x-api-key` header.
+Keys are stored in `chrome.storage.local` and sent per-request via the `x-api-key` header.
+The backend holds **no API keys** — it is stateless and key-agnostic.
 
 ## Development
 
@@ -98,7 +99,27 @@ shared/      Shared types and utilities
 | Poe | `poe.ts` | contenteditable |
 | HuggingChat | `huggingchat.ts` | textarea |
 
+## Environment Variables (Backend)
+
+| Variable | Required | Default | Notes |
+|----------|----------|---------|-------|
+| `PORT` | No | `3001` | |
+| `NODE_ENV` | No | `development` | `production` = stricter CORS |
+| `SESSION_SECRET` | Prod | — | ≥16 chars; signs JWT session tokens |
+| `CORS_ORIGIN` | Prod | `*` | Comma-separated origins; cannot be `*` in production |
+| `ANTHROPIC_MODEL` | No | `claude-haiku-4-5-20251001` | Model used for rewriting |
+
+> **Note:** `ANTHROPIC_API_KEY` is **not** a server env var. Clients provide their own key via the `x-api-key` header on every request.
+
 ## Changelog
+
+### v1.2 — Per-Request API Key Migration
+
+- Removed server-side `ANTHROPIC_API_KEY` dependency — backend no longer holds any LLM keys
+- `x-api-key` header is now **required** on all `/v1/rewrite` and `/v1/brief/*` endpoints
+- Missing key returns `400 MISSING_API_KEY` with clear error message
+- Removed singleton Anthropic client — fresh instance created per request for isolation
+- Server starts cleanly without any Anthropic credentials in the environment
 
 ### v1.1 — Multi-Platform UI & Engine Hardening
 

@@ -59,6 +59,7 @@ describe("Auth middleware", () => {
     const res = await request(app)
       .post("/v1/rewrite")
       .set("Authorization", `Bearer ${token}`)
+      .set("x-api-key", "sk-ant-test-key-for-unit-tests")
       .send({ prompt: "Help me code", site: "chatgpt", history: [] });
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty("enhanced_prompt");

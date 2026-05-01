@@ -22,23 +22,12 @@ export interface LlmResult {
   model: string;
 }
 
-let _client: Anthropic | null = null;
-
 function getClient(apiKey?: string): Anthropic | null {
-  // Per-request key: fresh instance, no caching (prevents cross-request leakage)
-  if (apiKey) {
-    return new Anthropic({ apiKey, timeout: TIMEOUT_MS, maxRetries: MAX_RETRIES });
-  }
-  // Env key: reuse singleton
-  const envKey = process.env["ANTHROPIC_API_KEY"] ?? process.env["LLM_API_KEY"] ?? "";
-  if (!envKey) {
-    logger.warn({ module: "llmClient" }, "ANTHROPIC_API_KEY not set — rewrite will fallback");
+  if (!apiKey) {
+    logger.warn({ module: "llmClient" }, "No API key provided — rewrite will fallback");
     return null;
   }
-  if (!_client) {
-    _client = new Anthropic({ apiKey: envKey, timeout: TIMEOUT_MS, maxRetries: MAX_RETRIES });
-  }
-  return _client;
+  return new Anthropic({ apiKey, timeout: TIMEOUT_MS, maxRetries: MAX_RETRIES });
 }
 
 /**
@@ -76,3 +65,4 @@ export async function callLlm(params: LlmCallParams, apiKey?: string): Promise<L
     return null;
   }
 }
+
