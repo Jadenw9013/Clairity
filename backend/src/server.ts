@@ -68,13 +68,7 @@ function corsOriginCallback(
     return;
   }
 
-  // Allow all Chrome extension origins (BYOK model — no server secrets to protect)
-  if (origin.startsWith("chrome-extension://")) {
-    callback(null, true);
-    return;
-  }
-
-  // Check explicit allowlist
+  // Check explicit allowlist (includes EXTENSION_ORIGINS)
   if (allowedOrigins.includes(origin)) {
     if (NODE_ENV !== "production") {
       logger.debug({ origin, rule: "allowlist" }, "CORS allowed");
