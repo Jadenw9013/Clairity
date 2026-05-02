@@ -3,13 +3,12 @@ import request from "supertest";
 import { app } from "../src/server.js";
 
 describe("CORS Security", () => {
-  it("should reject chrome-extension origins not in EXTENSION_ORIGINS", async () => {
+  it("should allow any chrome-extension origin (zero-config for users)", async () => {
     const res = await request(app)
       .get("/v1/health")
-      .set("Origin", "chrome-extension://unknown-extension-id");
+      .set("Origin", "chrome-extension://any-extension-id");
 
-    // Only extensions listed in EXTENSION_ORIGINS env var are allowed
-    expect(res.headers["access-control-allow-origin"]).toBeUndefined();
+    expect(res.headers["access-control-allow-origin"]).toBe("chrome-extension://any-extension-id");
   });
 
   it("should reject non-allowlisted web origins", async () => {
@@ -20,4 +19,3 @@ describe("CORS Security", () => {
     expect(res.headers["access-control-allow-origin"]).toBeUndefined();
   });
 });
-

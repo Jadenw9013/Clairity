@@ -68,7 +68,14 @@ function corsOriginCallback(
     return;
   }
 
-  // Check explicit allowlist (includes EXTENSION_ORIGINS)
+  // Allow ALL Chrome extension origins — no per-extension config needed.
+  // Safe: only real extensions can use this scheme; requests still require JWT + x-api-key.
+  if (origin.startsWith("chrome-extension://")) {
+    callback(null, true);
+    return;
+  }
+
+  // Check explicit allowlist for web origins
   if (allowedOrigins.includes(origin)) {
     if (NODE_ENV !== "production") {
       logger.debug({ origin, rule: "allowlist" }, "CORS allowed");
